@@ -48,6 +48,39 @@
   sessions. Reviewed images omit account/server details and contain no EXIF. No server
   trust-policy changes or protected AI acceptance are implied by these screenshots.
 
+### Requested follow-up: Home and audiobook player
+
+- Captured the English Home screen with real server metadata. The published image
+  hides the account login and avatar initial with opaque fills; system bars are cropped.
+- Used the library's audio-format filter to find Harry Potter and the Philosopher's
+  Stone, narrated by Stephen Fry. Started streaming Opening Credits through Listen,
+  captured the player while its position advanced, then paused at **0:15**. The final
+  UI showed Play rather than Pause, confirming playback was left paused.
+- This can record an audio position/session for the authorized screenshot account.
+  No permanent download, AI request or server-policy modification was requested.
+- This demonstrates player UI and advancing playback on the API 36 emulator, which
+  runs with `-no-audio`; it does not establish audible output, physical-device behavior,
+  Bluetooth, Cast, long-running streaming or OEM/Doze acceptance.
+- Published only reviewed Home/player images without endpoint/credential labels or
+  EXIF. Raw screenshots and UI hierarchies remain under ignored `.local/`.
+
+### Home and history refresh finding
+
+- The first Home image and earlier statistics still showed their previously loaded
+  state. After pull-to-refresh, Home displayed Continue reading, Up next to read,
+  Continue listening and a one-day streak. No new reading or playback was needed.
+- After Refresh in Reading stats, the server showed **3 started/in-progress books**,
+  **8 minutes** of activity and a **one-day** streak. Session history listed Dungeon
+  Crawler Carl and JoJo sessions in the current UTC week. These are server-reported
+  observations, not fabricated screenshot data or an independent timing audit.
+- Replaced the README references to the stale Home/empty statistics images with
+  refreshed captures and added a session-history image. The original captures remain
+  available as dated evidence; login/avatar labels are hidden in the published Home.
+- **Open bug:** DashboardViewModel refreshes on creation/manual refresh, but its screen
+  has no refresh-on-return lifecycle hook. Stats likewise can retain an old view until
+  Refresh. Automatic refresh after reading/listening still needs a code fix and regression
+  tests; the screenshot update alone does not fix it.
+
 This is the current English acceptance checklist. The complete dated test journal
 is preserved in [the source archive](history/DEVICE_TESTING.source-2026-11-26.md).
 Use the [plan](CLIENT_PLAN.md) for implementation status and the [README](../README.md)

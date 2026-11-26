@@ -26,7 +26,7 @@
 ## What it does
 
 <div align="center">
-  <img src="docs/images/home-en.png" width="220" alt="English Home screen with the account name hidden">
+  <img src="docs/images/home-active-en.png" width="220" alt="English Home screen with Continue reading, Up next to read and Continue listening; account name hidden">
   &nbsp;&nbsp;
   <img src="docs/images/library-en.png" width="220" alt="English library screen with book covers from a self-hosted server">
   &nbsp;&nbsp;
@@ -38,9 +38,11 @@
   &nbsp;&nbsp;
   <img src="docs/images/audio-player-en.png" width="220" alt="English audiobook player streaming Harry Potter, narrated by Stephen Fry">
   <br>
-  <img src="docs/images/stats-en.png" width="220" alt="English reading statistics showing the screenshot account's empty history">
+  <img src="docs/images/stats-active-en.png" width="220" alt="English reading statistics with three started books and eight minutes of server-recorded activity">
+  &nbsp;&nbsp;
+  <img src="docs/images/history-en.png" width="220" alt="English session history showing recorded book and manga reading sessions">
   <p><sub>0.9.23 · English UI · self-hosted library, shown with the server owner's permission. Book text and artwork belong to their respective rights holders.</sub></p>
-  <p><sub>The Home account name is hidden. Statistics were captured before the reading session. EPUB pagination depends on the font and screen size.</sub></p>
+  <p><sub>The Home account name is hidden. Home and statistics were refreshed after the screenshot sessions. EPUB pagination depends on the font and screen size.</sub></p>
 </div>
 
 | | Features |

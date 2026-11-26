@@ -64,6 +64,23 @@
 - Published only reviewed Home/player images without endpoint/credential labels or
   EXIF. Raw screenshots and UI hierarchies remain under ignored `.local/`.
 
+### Home and history refresh finding
+
+- The first Home image and earlier statistics still showed their previously loaded
+  state. After pull-to-refresh, Home displayed Continue reading, Up next to read,
+  Continue listening and a one-day streak. No new reading or playback was needed.
+- After Refresh in Reading stats, the server showed **3 started/in-progress books**,
+  **8 minutes** of activity and a **one-day** streak. Session history listed Dungeon
+  Crawler Carl and JoJo sessions in the current UTC week. These are server-reported
+  observations, not fabricated screenshot data or an independent timing audit.
+- Replaced the README references to the stale Home/empty statistics images with
+  refreshed captures and added a session-history image. The original captures remain
+  available as dated evidence; login/avatar labels are hidden in the published Home.
+- **Open bug:** DashboardViewModel refreshes on creation/manual refresh, but its screen
+  has no refresh-on-return lifecycle hook. Stats likewise can retain an old view until
+  Refresh. Automatic refresh after reading/listening still needs a code fix and regression
+  tests; the screenshot update alone does not fix it.
+
 This is the current English acceptance checklist. The complete dated test journal
 is preserved in [the source archive](history/DEVICE_TESTING.source-2026-11-26.md).
 Use the [plan](CLIENT_PLAN.md) for implementation status and the [README](../README.md)

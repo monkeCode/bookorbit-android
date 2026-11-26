@@ -84,6 +84,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
 
+      - name: Install pinned Android build tools
+        run: sdkmanager 'platforms;android-36' 'platforms;android-37.2' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.30.5'
+
       - name: Set up release signing
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -91,6 +94,8 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
+          umask 077
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           cat > app/keystore.properties <<EOF
           storeFile=$RUNNER_TEMP/release.jks
@@ -101,6 +106,23 @@ jobs:
 
       - name: Assemble signed release APKs and Play bundle
         run: ./gradlew :app:assembleFullRelease :app:assembleFdroidRelease :app:bundleFullRelease --no-daemon --stacktrace
+
+      - name: Verify production APK signer and alignment
+        env:
+          EXPECTED_CERT: ${{ vars.RELEASE_CERTIFICATE_SHA256 }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_CERT" =~ ^[0-9a-f]{64}$ ]]
+          for flavor in full fdroid; do
+            APK="app/build/outputs/apk/$flavor/release/app-$flavor-release.apk"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/signer.txt"
+            grep -Fx "Signer #1 certificate SHA-256 digest: $EXPECTED_CERT" "$RUNNER_TEMP/signer.txt"
+            "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 "$APK"
+          done
+
+      - name: Remove private signing files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks" app/keystore.properties
 
       - name: Attach APKs to release
         env:

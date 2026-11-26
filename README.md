@@ -137,6 +137,10 @@ certificate SHA-256:
 **Verify your artifact; do not trust this example blindly.** Prefer a stable private
 release-signing key for a friends-and-family deployment. Never upload that private key.
 
+Production builds use a separate package/certificate pair. See
+[production signing identity](docs/SIGNING.md#production-identity) for its public
+certificate and SHA-256; do not apply the debug fingerprint to a production APK.
+
 ### 2. Add the exact pair in a separate server source checkout
 
 Back up your database and deployment configuration first. Work from the **same server
@@ -287,6 +291,7 @@ and book contents. Review the exported file before sharing it.
 | [Client plan](docs/CLIENT_PLAN.md) | Detailed requirements, invariants and remaining work |
 | [Device testing](docs/DEVICE_TESTING.md) | Acceptance checklist and evidence boundaries |
 | [Local development](tools/README.md) | Docker builds, fixture server and emulator |
+| [Signing and CI](docs/SIGNING.md) | Production certificate, key backup, PR checks and release environments |
 | [AI compatibility](docs/AI_COMPATIBILITY.md) | Audited server contracts and attestation |
 | [Audio compatibility](docs/AUDIO_COMPATIBILITY.md) | Direct play, decoder fallback and transcoding limits |
 

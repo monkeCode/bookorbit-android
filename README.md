@@ -26,17 +26,21 @@
 ## What it does
 
 <div align="center">
+  <img src="docs/images/home-en.png" width="220" alt="English Home screen with the account name hidden">
+  &nbsp;&nbsp;
   <img src="docs/images/library-en.png" width="220" alt="English library screen with book covers from a self-hosted server">
   &nbsp;&nbsp;
   <img src="docs/images/book-details-en.png" width="220" alt="English book details with the Story Guide entry">
-  &nbsp;&nbsp;
-  <img src="docs/images/stats-en.png" width="220" alt="English reading statistics showing the screenshot account's empty history">
   <br>
-  <img src="docs/images/reader-page10-en.png" width="260" alt="Dungeon Crawler Carl text in the EPUB reader, ten screen pages from the cover">
+  <img src="docs/images/reader-page10-en.png" width="220" alt="Dungeon Crawler Carl text in the EPUB reader, ten screen pages from the cover">
   &nbsp;&nbsp;
-  <img src="docs/images/manga-en.png" width="260" alt="JoJo's Bizarre Adventure manga open in the CBZ reader">
+  <img src="docs/images/manga-en.png" width="220" alt="JoJo's Bizarre Adventure manga open in the CBZ reader">
+  &nbsp;&nbsp;
+  <img src="docs/images/audio-player-en.png" width="220" alt="English audiobook player streaming Harry Potter, narrated by Stephen Fry">
+  <br>
+  <img src="docs/images/stats-en.png" width="220" alt="English reading statistics showing the screenshot account's empty history">
   <p><sub>0.9.23 · English UI · self-hosted library, shown with the server owner's permission. Book text and artwork belong to their respective rights holders.</sub></p>
-  <p><sub>Statistics show the account's empty history before the reading session. EPUB pagination depends on the font and screen size.</sub></p>
+  <p><sub>The Home account name is hidden. Statistics were captured before the reading session. EPUB pagination depends on the font and screen size.</sub></p>
 </div>
 
 | | Features |

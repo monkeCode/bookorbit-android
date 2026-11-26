@@ -1,6 +1,7 @@
 name: Android Build
 
-# Builds and tests the native Kotlin Android app. Runs on every PR and on pushes to main.
+# Android checks/build, called for code PRs or explicitly for a release/manual build.
+# PR routing and its single required result live in pr-checks.yml. No push trigger.
 #
 # Two flavors: "full" (default, keeps Chromecast support) and "fdroid" (excludes Google's
 # proprietary Cast/Play-Services libraries entirely, for the official F-Droid submission) -- see
@@ -11,9 +12,6 @@ name: Android Build
 # CI artifacts use an ephemeral runner key and are NOT upgrade-compatible release APKs.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
   workflow_call:
 

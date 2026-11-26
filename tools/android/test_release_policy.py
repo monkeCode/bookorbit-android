@@ -49,6 +49,16 @@ class ReleasePolicyTest(unittest.TestCase):
         self.assertNotIn("secrets.", text)
         self.assertNotIn("environment:", text)
         self.assertNotIn("Release --", text)
+        self.assertNotIn("  push:", text)
+        self.assertNotIn("  pull_request:", text)
+        self.assertIn("  workflow_call:", text)
+
+    def test_stable_signing_is_environment_gated_and_signer_is_checked(self):
+        text = (Path(__file__).parents[2] / ".github/workflows/android-release.yml").read_text()
+        self.assertIn("environment: stable-release", text)
+        self.assertIn("vars.RELEASE_CERTIFICATE_SHA256", text)
+        self.assertIn('github.ref == \'refs/heads/main\'', text)
+        self.assertIn("Remove private signing files", text)
 
     def test_only_release_publish_job_uses_debug_key(self):
         text = (Path(__file__).parents[2] / ".github/workflows/debug-release.yml").read_text()

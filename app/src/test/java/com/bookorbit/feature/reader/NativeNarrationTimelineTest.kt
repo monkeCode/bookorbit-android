@@ -17,6 +17,31 @@ class NativeNarrationTimelineTest {
     private fun timeline(value: NativeNarrationPlaylist = playlist) = NativeNarrationTimeline(value, 5, 84)
     private val saved = ReadAlongPosition(0, "OPS/0.xhtml#two", "OPS/0.mp3", 11.724068, 1.25)
 
+    @Test fun `audio only seek maps book clock into exact embedded resource time`() {
+        val value = timeline().atSeconds(23.5, 1.25)!!
+        assertEquals(2, value.sectionIndex)
+        assertEquals("OPS/2.mp3", value.audioSrc)
+        assertEquals(3.5, value.audioSeconds, 0.0)
+        assertEquals(23.5, timeline().absoluteSeconds(value)!!, 0.0)
+        assertEquals(1.25, value.rate, 0.0)
+    }
+
+    @Test fun `server narration marker is accepted only at an exact unambiguous clip clock`() {
+        val point = com.bookorbit.core.sync.ProgressPoint(84, 75.0, seconds = 3.25, fragment = "OPS/2.xhtml#one", section = 2)
+        assertEquals("OPS/2.mp3", timeline().fromServer(point)!!.audioSrc)
+        assertEquals(3.25, timeline().fromServer(point)!!.audioSeconds, 0.0)
+        assertNull(timeline().fromServer(point.copy(fileId = 85)))
+        assertNull(timeline().fromServer(point.copy(seconds = 200.0)))
+        assertNull(timeline().fromServer(point.copy(fragment = "missing")))
+        val ended = timeline().fromServer(point.copy(percentage = 100.0, seconds = 20.0, fragment = "OPS/2.xhtml#two"))!!
+        assertTrue(ended.completed)
+    }
+
+    @Test fun `unknown narration duration never guesses an audio seek from text percentage`() {
+        val unknown = playlist.copy(items = playlist.items.mapIndexed { index, clip -> if (index == 3) clip.copy(clipEndSeconds = null, durationSeconds = null) else clip })
+        assertNull(timeline(unknown).atSeconds(20.0, 1.0))
+    }
+
     @Test fun `selection accepts only the exact start of a unique narrated fragment`() {
         val start = saved.copy(audioSeconds = 10.0)
         assertEquals(1, timeline().selectionStart(start)!!.index)

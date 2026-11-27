@@ -65,6 +65,8 @@ class ComicReaderViewModel @Inject constructor(
         val pageCount: Int = 0,
         val initialPage: Int = 0,
         val currentPage: Int = 0,
+        val remotePage: Int? = null,
+        val remoteSequence: Long = 0,
     )
 
     private val _ui = MutableStateFlow(UiState())
@@ -76,11 +78,23 @@ class ComicReaderViewModel @Inject constructor(
 
     private var lastSaved = 0L
     private var pendingPage: Int? = null
+    private var progressLease: com.bookorbit.core.sync.ProgressLease? = null
+    private var restoringPage: Int? = null
     private var archive: ComicArchive? = null
     private var cbz = false
 
     init {
         load()
+        viewModelScope.launch { progress.sync?.applied?.collect { change ->
+            if (change.kind == "text" && change.bookId == bookId && change.point.fileId == selectedFileId) {
+                pendingPage = null; progressLease = change.lease
+                val state = _ui.value
+                val page = ComicPaging.pageForCheckpoint(change.point.cfi, change.point.page, change.point.percentage / 100.0, state.pageCount)
+                restoringPage = page.takeUnless { it == state.currentPage }
+                _ui.update { it.copy(currentPage = page, remotePage = page, remoteSequence = it.remoteSequence + 1) }
+                if (restoringPage == null) progress.sync?.acknowledge(change.lease)
+            }
+        } }
     }
 
     fun load() {
@@ -130,7 +144,8 @@ class ComicReaderViewModel @Inject constructor(
                 }
                 return@launch
             }
-            val initial = progress.resolveInitial(file.id)
+            val initial = progress.resolveInitial(file.id, bookId, book.title.orEmpty())
+            progressLease = progress.lease(file.id)
             if (!session.owns(activityOwner)) return@launch
             activityOwner?.let { lastEditions.record(it, bookId, file.id) }
             val stored = ComicPaging.pageForCheckpoint(initial.cfi, initial.pageNumber, initial.fraction, count)
@@ -148,12 +163,16 @@ class ComicReaderViewModel @Inject constructor(
     }
 
     fun onPageChanged(page: Int) {
+        restoringPage?.let { expected ->
+            if (page == expected) { restoringPage = null; progressLease?.let { lease -> viewModelScope.launch { progress.sync?.acknowledge(lease) } } }
+            return
+        }
         val s = _ui.value
         if (s.pageCount <= 0 || page == s.currentPage) return
         _ui.update { it.copy(currentPage = page) }
         pendingPage = page
         readingHandle?.let { sessions.onReadingProgress(it, ComicPaging.percentage(page, s.pageCount)) }
-        if (System.currentTimeMillis() - lastSaved >= PROGRESS_THROTTLE_MS) flush()
+        flush()
     }
 
     fun setRtl(value: Boolean) {
@@ -174,9 +193,7 @@ class ComicReaderViewModel @Inject constructor(
         if (s.fileId == 0 || s.pageCount <= 0) return
         pendingPage = null
         lastSaved = System.currentTimeMillis()
-        viewModelScope.launch {
-            progress.report(s.fileId, cfi = if (cbz) ComicPaging.cfiForPage(page) else null, percentage = ComicPaging.percentage(page, s.pageCount), pageNumber = ComicPaging.pageNumber(page))
-        }
+        progress.record(s.fileId, cfi = if (cbz) ComicPaging.cfiForPage(page) else null, percentage = ComicPaging.percentage(page, s.pageCount), pageNumber = ComicPaging.pageNumber(page), lease = progressLease)
     }
 
     override fun onCleared() {

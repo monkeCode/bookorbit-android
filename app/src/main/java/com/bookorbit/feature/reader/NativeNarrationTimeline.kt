@@ -116,6 +116,33 @@ class NativeNarrationTimeline(playlist: NativeNarrationPlaylist, expectedBookId:
         return ReadAlongPosition(clip.sectionIndex, clip.fragment, clip.audioHref, assetSeconds, rate, completed).takeIf { it.valid() }
     }
 
+    fun absoluteSeconds(position: ReadAlongPosition): Double? {
+        val location = restore(position.copy(completed = false)) ?: return null
+        if (clips.take(location.index).any { it.clipEndSeconds == null }) return null
+        return clips.take(location.index).sumOf { it.clipEndSeconds!! - it.clipBeginSeconds } +
+            (position.audioSeconds - clips[location.index].clipBeginSeconds).coerceAtLeast(0.0)
+    }
+
+    fun atSeconds(seconds: Double, rate: Double): ReadAlongPosition? {
+        val duration = durationSeconds ?: return null
+        if (!seconds.isFinite()) return null
+        var remaining = seconds.coerceIn(0.0, duration)
+        for ((index, clip) in clips.withIndex()) {
+            val length = clip.clipEndSeconds!! - clip.clipBeginSeconds
+            if (remaining < length || index == clips.lastIndex) return checkpoint(index, (remaining.coerceAtMost(length) * 1000).toLong(), rate)
+            remaining -= length
+        }
+        return null
+    }
+
+    fun fromServer(point: com.bookorbit.core.sync.ProgressPoint, rate: Double = 1.0): ReadAlongPosition? {
+        if (point.fileId != fileId || point.seconds == null || point.fragment == null || point.section == null) return null
+        val matches = clips.filter { it.sectionIndex == point.section && it.fragment == point.fragment && point.seconds >= it.clipBeginSeconds &&
+            (it.clipEndSeconds == null || point.seconds < it.clipEndSeconds || it.index == clips.lastIndex && point.seconds == it.clipEndSeconds) }
+        return matches.singleOrNull()?.let { ReadAlongPosition(it.sectionIndex, it.fragment, it.audioHref, point.seconds, rate,
+            completed = point.percentage >= 100.0 && it.index == clips.lastIndex && point.seconds == it.clipEndSeconds) }
+    }
+
     private fun start(clip: NativeNarrationClip) = Location(clip.index, clip.clipBeginSeconds, 0)
 
     companion object {

@@ -27,12 +27,32 @@ internal class NativeNarrationPlayback(
     private val beforePlay: () -> Unit,
     private val beforeNarration: () -> Unit,
     private val restoreAudiobook: () -> Unit,
+    private val progress: com.bookorbit.core.sync.ProgressSync? = null,
 ) : NativeNarrationSession.Port {
     private var queue: NativeNarrationQueue? = null
     private var owner: ReadAlongOwner? = null
     private var wrapper: NativeNarrationPlayer? = null
     private var activity: NarrationHandle? = null
     private var poll: Job? = null
+    private var progressLease: com.bookorbit.core.sync.ProgressLease? = null
+    private var lastPosition: ReadAlongPosition? = null
+    private var blockedPosition = false
+    private val progressObserver = scope.launch {
+        progress?.applied?.collect { change ->
+            val current = queue ?: return@collect
+            if (change.kind == "narration" && change.bookId == current.plan.timeline.bookId && change.point.fileId == current.plan.timeline.fileId) {
+                progressLease = null
+                wrapper?.pause()
+                val exact = current.plan.timeline.fromServer(change.point, wrapper?.playbackParameters?.speed?.toDouble() ?: 1.0)
+                if (exact == null) { blockedPosition = true; update("position"); return@collect }
+                blockedPosition = false
+                if (wrapper?.seekToCheckpoint(exact) == true) {
+                    lastPosition = exact; progressLease = change.lease
+                    progress?.acknowledge(change.lease); update()
+                } else { blockedPosition = true; update("position") }
+            }
+        }
+    }
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) { update() }
         override fun onPlaybackStateChanged(playbackState: Int) { update() }
@@ -42,7 +62,7 @@ internal class NativeNarrationPlayback(
         session.state.collect { queue?.let { if (!session.owns(it.plan.owner)) leave() } }
     }
 
-    fun release() { leave(); accountObserver.cancel() }
+    fun release() { leave(); accountObserver.cancel(); progressObserver.cancel() }
 
     override fun start(queue: NativeNarrationQueue, owner: ReadAlongOwner, saved: ReadAlongPosition?, section: Int) {
         require(session.owns(queue.plan.owner) && owner.fileId == queue.plan.timeline.fileId &&
@@ -56,9 +76,12 @@ internal class NativeNarrationPlayback(
         player.pause()
         this.queue = queue
         this.owner = owner
+        blockedPosition = false
+        progressLease = queue.progressLease
+        lastPosition = saved
         activity = activities.beginNarration(owner.fileId, queue.plan.owner)
         player.setMediaSources(sources, location.index, location.clipOffsetMs)
-        val native = NativeNarrationPlayer(player, queue, { session.owns(queue.plan.owner) }, beforePlay)
+        val native = NativeNarrationPlayer(player, queue, { session.owns(queue.plan.owner) && !blockedPosition }, beforePlay)
         wrapper = native
         mediaSession.setPlayer(native)
         player.addListener(listener)
@@ -89,6 +112,7 @@ internal class NativeNarrationPlayback(
         val current = wrapper ?: return
         val queue = queue ?: return
         if (!session.owns(queue.plan.owner)) { leave(); return }
+        if (blockedPosition && action != "stop") { update("position"); return }
         when (action) {
             "pause" -> current.pause()
             "start", "resume" -> {
@@ -110,23 +134,37 @@ internal class NativeNarrationPlayback(
         update()
     }
 
+    override fun seekTo(seconds: Double) {
+        val current = queue ?: return
+        val target = current.plan.timeline.atSeconds(seconds, wrapper?.playbackParameters?.speed?.toDouble() ?: 1.0) ?: return
+        if (wrapper?.seekToCheckpoint(target) == true) update()
+    }
+
     private fun update(error: String? = null) {
         val native = wrapper ?: return
         val queue = queue ?: return
         val owner = owner ?: return
         if (!session.owns(queue.plan.owner)) return
-        val position = native.checkpoint()
+        val position = if (native.playerError == null && native.playbackState != Player.STATE_IDLE) native.checkpoint()?.also { lastPosition = it } else lastPosition
         if (position != null) positions.record(owner, position)
+        if (position != null) progressLease?.let { lease ->
+            val absolute = queue.plan.timeline.absoluteSeconds(position)
+            val duration = queue.plan.timeline.durationSeconds
+            val percent = if (absolute != null && duration != null && duration > 0) (absolute / duration * 100).coerceIn(0.0, 100.0) else 0.0
+            progress?.record(lease, com.bookorbit.core.sync.ProgressPoint(owner.fileId, percent, seconds = position.audioSeconds,
+                fragment = position.fragment, section = position.sectionIndex))
+        }
         activity?.let { activities.setNarrationActive(it, native.isPlaying) }
         val state = when {
-            error != null || native.playerError != null -> "error"
+            blockedPosition || error != null || native.playerError != null -> "error"
             native.playbackState == Player.STATE_ENDED -> "ended"
             native.playbackState == Player.STATE_BUFFERING -> "loading"
             native.isPlaying -> "playing"
             else -> "paused"
         }
         shared.publish(NativeNarrationSession.State(owner, queue.plan.timeline.bookId,
-            ReaderEvent.ReadAlong(true, state, native.playbackParameters.speed.toDouble(), error, position)))
+            ReaderEvent.ReadAlong(true, state, native.playbackParameters.speed.toDouble(), if (blockedPosition) "position" else error, position), queue.title,
+            position?.let(queue.plan.timeline::absoluteSeconds), queue.plan.timeline.durationSeconds))
     }
 
     override fun leave() {
@@ -139,6 +177,8 @@ internal class NativeNarrationPlayback(
         activity?.let(activities::endNarration); activity = null
         val released = queue
         queue = null; owner = null
+        progressLease = null; lastPosition = null
+        blockedPosition = false
         player.clearMediaItems()
         released?.plan?.close()
         shared.publish(null)

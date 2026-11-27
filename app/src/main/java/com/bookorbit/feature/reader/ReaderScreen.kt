@@ -57,6 +57,7 @@ fun ReaderScreen(
     vm: ReaderViewModel = hiltViewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val latestUi = androidx.compose.runtime.rememberUpdatedState(ui)
     val controller = remember { ReaderController() }
     var ready by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf(false) }
@@ -84,7 +85,7 @@ fun ReaderScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, controller) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) controller.readAlong("pause")
+            if (event == Lifecycle.Event.ON_STOP) { vm.flush(); controller.readAlong("pause") }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer); controller.readAlong("stop") }
@@ -133,9 +134,10 @@ fun ReaderScreen(
         controller.listener = { event ->
             when (event) {
                 is ReaderEvent.ChatContext -> Unit // Consumed by ReaderController's request correlation.
+                is ReaderEvent.PositionRestored -> vm.remotePositionRestored(event.ticket, event.success)
                 is ReaderEvent.Ready -> ready = true
                 is ReaderEvent.Loaded -> vm.onLoaded(event.toc, event.title, event.rightToLeft)
-                is ReaderEvent.Relocate -> vm.onRelocate(event.cfi, event.fraction, event.chapterTitle, event.sectionIndex)
+                is ReaderEvent.Relocate -> vm.onRelocate(event.cfi, event.fraction, event.chapterTitle, event.sectionIndex, event.movedByUser)
                 is ReaderEvent.Error -> vm.onError(event.message)
                 is ReaderEvent.ReadAlong -> { readAlong = event; vm.onReadAlong(event) }
                 is ReaderEvent.Tap -> onTap.value(event.x)
@@ -145,6 +147,15 @@ fun ReaderScreen(
                 is ReaderEvent.Selection -> vm.onSelection(event.text, event.cfi, event.rect, event.narration)
                 ReaderEvent.SelectionCleared -> vm.onSelectionCleared()
                 is ReaderEvent.AnnotationTap -> vm.onAnnotationTap(event.cfi, event.rect)
+            }
+        }
+    }
+
+    LaunchedEffect(vm) {
+        vm.positionChanges?.collect { change ->
+            if (change.kind == "text" && change.bookId == vm.bookId && change.point.fileId == latestUi.value.resolved?.fileId) {
+                vm.acceptRemotePosition(change)
+                controller.restorePosition(change.point.cfi, change.point.percentage / 100.0, change.lease.epoch.toString())
             }
         }
     }

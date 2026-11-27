@@ -138,12 +138,12 @@ class ReaderViewModel @Inject constructor(
     suspend fun nativeReadAlong(action: String, rate: Double?, fromSelection: ReadAlongPosition? = null): Boolean {
         if (action == "selection" && fromSelection == null) return false
         val owner = readAlongOwner ?: return false
-        if (fromSelection != null && nativeNarration.state.value?.owner == owner) {
+        if (fromSelection != null && nativeNarration.state.value?.owner == owner && nativeNarration.state.value?.event?.error != "position") {
             if (!nativeNarration.listenFrom(owner, fromSelection))
                 _ui.update { it.copy(message = UiText.of(R.string.reader_native_narration_failed)) }
             return true
         }
-        if (fromSelection == null && nativeNarration.command(owner, action, rate)) return true
+        if (fromSelection == null && nativeNarration.state.value?.event?.error != "position" && nativeNarration.command(owner, action, rate)) return true
         val resolved = _ui.value.resolved ?: return false
         if (action !in setOf("start", "resume", "restart", "selection") ||
             player.state.value.isCasting) return false
@@ -159,12 +159,14 @@ class ReaderViewModel @Inject constructor(
             if (fromSelection != null) require(plan.timeline.selectionStart(fromSelection) != null) { "Selected narration fragment changed" }
             val saved = if (fromSelection != null) fromSelection.copy(rate = rate?.takeIf { it.isFinite() && it in 0.5..2.0 } ?: 1.0)
                 else if (action == "restart") null else readAlongPositions.load(owner)
-            val queue = NativeNarrationQueue(plan, _ui.value.title.orEmpty())
+            val synchronized = progress.sync?.openNarration(plan, _ui.value.title.orEmpty(), readAlongPositions.load(owner), explicitStart = fromSelection != null || action == "restart")
+            val resume = if (fromSelection != null || action == "restart") saved else synchronized?.first ?: saved
+            val queue = NativeNarrationQueue(plan, _ui.value.title.orEmpty(), progressLease = synchronized?.second)
             if (!player.prepareForNativeNarration {
                 nativeNarration.isCurrent(ticket) && session.owns(account) && !player.state.value.isCasting
             }) return true
             if (!session.owns(account) || player.state.value.isCasting) return true
-            nativeOwnsCheckpoints = nativeNarration.start(ticket, queue, owner, saved, currentSection)
+            nativeOwnsCheckpoints = nativeNarration.start(ticket, queue, owner, resume, currentSection)
             if (nativeOwnsCheckpoints) pending = null
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (_: Exception) { _ui.update { it.copy(message = UiText.of(com.bookorbit.R.string.reader_native_narration_failed)) } }
@@ -190,6 +192,21 @@ class ReaderViewModel @Inject constructor(
 
     /** Where the reader is now, so a bookmark can be dropped there. */
     private var currentCfi: String? = null
+    private var progressLease: com.bookorbit.core.sync.ProgressLease? = null
+    private var applyingRemote = false
+    val positionChanges get() = progress.sync?.applied
+    fun acceptRemotePosition(change: com.bookorbit.core.sync.PositionApplied) {
+        if (change.kind != "text" || change.bookId != bookId || change.point.fileId != selectedFileId) return
+        pending = null; currentCfi = change.point.cfi; progressLease = change.lease
+        applyingRemote = true
+    }
+    fun remotePositionRestored(ticket: String, success: Boolean) {
+        val lease = progressLease ?: return
+        if (ticket != lease.epoch.toString()) return
+        if (!success) { _ui.update { it.copy(message = UiText.of(R.string.sync_apply_failed)) }; return }
+        applyingRemote = false
+        viewModelScope.launch { progress.sync?.acknowledge(lease) }
+    }
 
     init {
         load()
@@ -242,7 +259,8 @@ class ReaderViewModel @Inject constructor(
                         }
                     } else null
                 } else null
-                val initial = progress.resolveInitial(selectedFileId)
+                val initial = progress.resolveInitial(selectedFileId, bookId, book.title.orEmpty())
+                progressLease = progress.lease(selectedFileId)
                 activityOwner?.let { lastEditions.record(it, bookId, selectedFileId) }
                 readingHandle = sessions.beginReading(selectedFileId, initial.fraction?.let { it * 100 }, activityOwner)
                 _ui.update {
@@ -281,7 +299,7 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun onRelocate(cfi: String?, fraction: Double?, chapterTitle: String?, sectionIndex: Int? = null) {
+    fun onRelocate(cfi: String?, fraction: Double?, chapterTitle: String?, sectionIndex: Int? = null, movedByUser: Boolean = true) {
         sectionIndex?.takeIf { it in 0..100_000 }?.let { currentSection = it }
         _ui.update {
             it.copy(
@@ -290,7 +308,7 @@ class ReaderViewModel @Inject constructor(
             )
         }
         if (cfi != null) currentCfi = cfi
-        if (cfi != null && fraction != null) {
+        if (!applyingRemote && movedByUser && cfi != null && fraction != null) {
             report(cfi, fraction * 100)
             readingHandle?.let { sessions.onReadingProgress(it, fraction * 100) }
         }
@@ -477,7 +495,7 @@ class ReaderViewModel @Inject constructor(
 
     private fun report(cfi: String?, percentage: Double) {
         pending = cfi to percentage
-        if (System.currentTimeMillis() - lastSaved >= PROGRESS_THROTTLE_MS) flush()
+        flush() // Local checkpoint on every actual move; network sync runs independently.
     }
 
     fun flush() {
@@ -485,7 +503,7 @@ class ReaderViewModel @Inject constructor(
         val p = pending ?: return
         pending = null
         lastSaved = System.currentTimeMillis()
-        viewModelScope.launch { progress.report(fileId, p.first, p.second) }
+        progress.record(fileId, p.first, p.second, lease = progressLease)
     }
 
     override fun onCleared() {

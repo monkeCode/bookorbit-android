@@ -19,11 +19,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PendingReadingSessionEntity::class,
         PendingAnnotationOpEntity::class,
         AnnotationCacheEntity::class,
+        ProgressSyncEntry::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 abstract class BookOrbitDatabase : RoomDatabase() {
+    abstract fun progressSyncDao(): ProgressSyncDao
     abstract fun readerProgressDao(): ReaderProgressDao
     abstract fun audioProgressDao(): AudioProgressDao
     abstract fun downloadDao(): DownloadDao
@@ -32,6 +34,12 @@ abstract class BookOrbitDatabase : RoomDatabase() {
     abstract fun pendingReadingSessionDao(): PendingReadingSessionDao
     abstract fun pendingAnnotationOpDao(): PendingAnnotationOpDao
     abstract fun annotationCacheDao(): AnnotationCacheDao
+}
+
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `progress_sync` (`key` TEXT NOT NULL, `userId` INTEGER NOT NULL, `bookId` INTEGER NOT NULL, `fileId` INTEGER NOT NULL, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `local` TEXT NOT NULL, `baseline` TEXT, `remote` TEXT, `dirty` INTEGER NOT NULL, `conflict` INTEGER NOT NULL, `epoch` INTEGER NOT NULL, `writeId` TEXT NOT NULL, `awaitingApply` INTEGER NOT NULL, PRIMARY KEY(`key`))")
+    }
 }
 
 /** Persist explicit download plans without modifying existing content or progress. */

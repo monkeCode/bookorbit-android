@@ -79,12 +79,24 @@ class PdfReaderViewModel @Inject constructor(
     private var navigationSequence = 0L
 
     private var fileId: Int = 0
+    private var progressLease: com.bookorbit.core.sync.ProgressLease? = null
+    private var restoringPage: Int? = null
     private var lastSaved = 0L
     private var pendingPage: Int? = null
     private var searchJob: kotlinx.coroutines.Job? = null
 
     init {
         load()
+        viewModelScope.launch { progress.sync?.applied?.collect { change ->
+            if (change.kind == "text" && change.bookId == bookId && change.point.fileId == fileId) {
+                pendingPage = null; progressLease = change.lease
+                val page = change.point.page?.minus(1) ?: PdfProgress.fractionToPage(change.point.percentage / 100.0, _ui.value.pageCount)
+                restoringPage = page.takeUnless { it == _ui.value.currentPage }
+                _ui.update { it.copy(currentPage = page.coerceIn(0, (it.pageCount - 1).coerceAtLeast(0))) }
+                goToPage(page)
+                if (restoringPage == null) progress.sync?.acknowledge(change.lease)
+            }
+        } }
     }
 
     private fun load() {
@@ -104,7 +116,8 @@ class PdfReaderViewModel @Inject constructor(
                 val resolved = source.resolvePdf(book, selectedFileId)
                 fileId = resolved.fileId
                 val core = PdfRenderCore.open(context, resolved.ref)
-                val initial = progress.resolveInitial(resolved.fileId)
+                val initial = progress.resolveInitial(resolved.fileId, bookId, book.title.orEmpty())
+                progressLease = progress.lease(resolved.fileId)
                 val page = initial.pageNumber?.takeIf { it > 0 }?.minus(1)?.coerceIn(0, core.pageCount - 1)
                     ?: PdfProgress.fractionToPage(initial.fraction, core.pageCount)
                 activityOwner?.let { lastEditions.record(it, bookId, resolved.fileId) }
@@ -125,6 +138,10 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     fun onPageChanged(pageIndex: Int) {
+        restoringPage?.let { expected ->
+            if (pageIndex == expected) { restoringPage = null; progressLease?.let { lease -> viewModelScope.launch { progress.sync?.acknowledge(lease) } } }
+            return
+        }
         val total = _ui.value.pageCount
         if (total <= 0) return
         val clamped = pageIndex.coerceIn(0, total - 1)
@@ -199,7 +216,7 @@ class PdfReaderViewModel @Inject constructor(
 
     private fun report(pageIndex: Int) {
         pendingPage = pageIndex
-        if (System.currentTimeMillis() - lastSaved >= PROGRESS_THROTTLE_MS) flush()
+        flush()
     }
 
     fun flush() {
@@ -210,7 +227,7 @@ class PdfReaderViewModel @Inject constructor(
         lastSaved = System.currentTimeMillis()
         val percentage = PdfProgress.pageToPercentage(page, total)
         val pageNumber = PdfProgress.pageNumber(page)
-        viewModelScope.launch { progress.report(fileId, cfi = null, percentage = percentage, pageNumber = pageNumber) }
+        progress.record(fileId, cfi = null, percentage = percentage, pageNumber = pageNumber, lease = progressLease)
     }
 
     override fun onCleared() {

@@ -1,0 +1,23 @@
+<resources>
+    <string name="sync_storage_failed">Не удалось сохранить позицию на телефоне. Приложение повторяет запись; не закрывайте его и проверьте свободное место. Несохранённые изменения не переживут принудительное завершение процесса.</string>
+    <string name="sync_apply_failed">Не удалось открыть точную серверную позицию. Отправка локальной позиции приостановлена, чтобы не затереть её. Откройте издание заново.</string>
+    <string name="narration_skip_back">Назад на 15 секунд</string>
+    <string name="narration_skip_forward">Вперёд на 15 секунд</string>
+    <string name="narration_editions">Выберите аудиоиздание</string>
+    <string name="narration_edition">Озвучка EPUB · файл №%1$d</string>
+    <string name="narration_no_editions">Подтверждённая озвучка EPUB недоступна. Для офлайн-прослушивания скачайте сам EPUB; отдельная аудиокнига не нужна.</string>
+    <string name="sync_book">Книга №%1$d</string>
+    <string name="sync_explanation">Прогресс изменился и на телефоне, и на сервере. Выберите позиции для этой книги. До выбора позиции не перезаписываются. Время сессий синхронизируется отдельно.</string>
+    <string name="sync_text">Место чтения</string>
+    <string name="sync_audio">Место прослушивания аудиокниги</string>
+    <string name="sync_narration">Место озвучки EPUB</string>
+    <string name="sync_phone">На телефоне</string>
+    <string name="sync_server">На сервере</string>
+    <string name="sync_choose_phone">Выбрать телефон</string>
+    <string name="sync_choose_server">Выбрать сервер</string>
+    <string name="sync_later">Позже</string>
+    <string name="sync_changed">Позиции изменились или сервер недоступен. Проверьте актуальные позиции перед повторным выбором.</string>
+    <string name="sync_audio_position">Файл №%1$d · %2$s</string>
+    <string name="sync_page">Страница %1$d</string>
+    <string name="sync_percentage">%1$.1f%%</string>
+</resources>

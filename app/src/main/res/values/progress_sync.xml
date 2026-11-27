@@ -1,0 +1,23 @@
+<resources>
+    <string name="sync_storage_failed">Local position storage failed. The app is retrying; keep it open and check free storage. Unsaved changes cannot survive a forced process stop.</string>
+    <string name="sync_apply_failed">The exact server position could not be opened. Local position reporting is paused to prevent overwriting it. Reopen this edition.</string>
+    <string name="narration_skip_back">Back 15 seconds</string>
+    <string name="narration_skip_forward">Forward 15 seconds</string>
+    <string name="narration_editions">Choose audio edition</string>
+    <string name="narration_edition">EPUB read-along · file #%1$d</string>
+    <string name="narration_no_editions">No verified read-along edition is available. For offline listening, download the EPUB itself; no separate audiobook download is needed.</string>
+    <string name="sync_book">Book #%1$d</string>
+    <string name="sync_explanation">Progress changed on this phone and on the server. Choose the positions to keep for this book. No position will be overwritten until you choose. Session time is synchronized separately.</string>
+    <string name="sync_text">Reading position</string>
+    <string name="sync_audio">Audiobook position</string>
+    <string name="sync_narration">EPUB narration position</string>
+    <string name="sync_phone">On this phone</string>
+    <string name="sync_server">On the server</string>
+    <string name="sync_choose_phone">Use phone</string>
+    <string name="sync_choose_server">Use server</string>
+    <string name="sync_later">Later</string>
+    <string name="sync_changed">The positions changed or the server is unavailable. Review the current positions before choosing again.</string>
+    <string name="sync_audio_position">File #%1$d · %2$s</string>
+    <string name="sync_page">Page %1$d</string>
+    <string name="sync_percentage">%1$.1f%%</string>
+</resources>

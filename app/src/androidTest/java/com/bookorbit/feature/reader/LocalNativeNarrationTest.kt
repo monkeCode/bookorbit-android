@@ -78,6 +78,7 @@ class LocalNativeNarrationTest {
                 val saved = main { native.checkpoint()!! }
                 assertEquals("OPS/ch.xhtml#a", saved.fragment)
                 assertEquals(3.25, saved.audioSeconds, 0.01)
+                main { assertTrue(native.seekToCheckpoint(saved)); assertFalse(native.seekToCheckpoint(saved.copy(audioSrc = "other.wav"))) }
                 val selected = source.timeline.checkpoint(1, 0, 1.0)!!
                 main {
                     assertFalse(native.seekToSelection(selected.copy(audioSeconds = 5.2)))

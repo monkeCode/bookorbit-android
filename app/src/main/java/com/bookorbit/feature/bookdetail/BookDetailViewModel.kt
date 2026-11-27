@@ -33,9 +33,39 @@ class BookDetailViewModel @Inject constructor(
     val storyGuides: StoryGuideRepository,
     private val lastReadEditions: com.bookorbit.feature.reader.LastReadEditionStore,
     private val readingProgress: com.bookorbit.feature.reader.ReaderProgressRepository,
+    private val narrated: com.bookorbit.feature.reader.NarratedEditions,
 ) : ViewModel() {
 
     val bookId: Int = savedStateHandle.get<Int>("id") ?: 0
+    val audioEditions = MutableStateFlow<List<com.bookorbit.feature.reader.NarratedEdition>>(emptyList())
+    val audioLoading = MutableStateFlow(false)
+    val audioStarting = MutableStateFlow(false)
+    val audioFailed = MutableStateFlow(false)
+    private var audioDiscovery: kotlinx.coroutines.Job? = null
+    private var audioDiscoveryGeneration = 0L
+    fun cancelAudioDiscovery() { audioDiscoveryGeneration++; audioDiscovery?.cancel(); audioLoading.value = false }
+    fun discoverAudio() {
+        val book = _ui.value.book ?: return
+        cancelAudioDiscovery()
+        val generation = audioDiscoveryGeneration
+        audioLoading.value = true; audioFailed.value = false
+        audioDiscovery = viewModelScope.launch {
+            try { audioEditions.value = narrated.discover(book) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { audioFailed.value = true }
+            finally { if (generation == audioDiscoveryGeneration) audioLoading.value = false }
+        }
+    }
+    fun playNarration(edition: com.bookorbit.feature.reader.NarratedEdition, opened: () -> Unit) {
+        val book = _ui.value.book ?: return
+        audioStarting.value = true; audioFailed.value = false
+        viewModelScope.launch {
+            try { narrated.play(book, edition); opened() }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { audioFailed.value = true }
+            finally { audioStarting.value = false }
+        }
+    }
     private val owner = session.owner()
 
     val downloadState = downloads.observe(bookId)

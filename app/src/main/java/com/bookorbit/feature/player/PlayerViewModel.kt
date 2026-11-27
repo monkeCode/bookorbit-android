@@ -17,6 +17,7 @@ import javax.inject.Inject
 class PlayerViewModel @Inject constructor(
     private val manager: PlayerManager,
     private val bookmarkRepo: AudiobookBookmarkRepository,
+    val narration: com.bookorbit.feature.reader.NativeNarrationSession,
 ) : ViewModel() {
     val state = manager.state
 

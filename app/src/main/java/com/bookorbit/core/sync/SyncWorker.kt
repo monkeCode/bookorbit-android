@@ -29,6 +29,7 @@ class SyncWorker @AssistedInject constructor(
     private val readingSessionTracker: ReadingSessionTracker,
     private val annotationRepository: ReaderAnnotationRepository,
     private val session: SessionManager,
+    private val positions: ProgressSync,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -37,8 +38,7 @@ class SyncWorker @AssistedInject constructor(
         val pending = listOf(
             readingSessionTracker.flushPending(),
             annotationRepository.flushPending(),
-            readerProgressRepository.flushPending(),
-            audioProgressRepository.flushPending(),
+            positions.flushPending(),
             bookDetailRepository.flushPendingRatings(),
             bookDetailRepository.flushPendingReadStatus(),
         )

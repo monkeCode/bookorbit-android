@@ -600,6 +600,7 @@ export class View extends HTMLElement {
     const koreaderDocFragmentIndex = getKoreaderDocFragmentIndex(this.book.sections, index)
     const koreaderProgress = getKoreaderProgress(koreaderDocFragmentIndex, range)
     this.lastLocation = {
+      reason,
       ...progress,
       sectionIndex: index,
       tocItem,

@@ -148,6 +148,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ComicPages(
     onToggleChrome: () -> Unit,
 ) {
     val pagerState = rememberPagerState(initialPage = ui.initialPage, pageCount = { ui.pageCount })
+    LaunchedEffect(ui.remoteSequence) { ui.remotePage?.let { pagerState.scrollToPage(it) } }
     val readerSettings by vm.readerSettings.collectAsStateWithLifecycle()
     val pageAnimation = readerPageAnimation(readerSettings.animatePageTurns)
     val scope = androidx.compose.runtime.rememberCoroutineScope()

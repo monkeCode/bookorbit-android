@@ -37,12 +37,20 @@ class AudioProgressRepository @Inject constructor(
     private val assets: AudiobookAssetResolver,
     private val json: Json,
     private val syncScheduler: SyncScheduler,
+    val sync: com.bookorbit.core.sync.ProgressSync? = null,
 ) {
+    private val leases = ConcurrentHashMap<Int, com.bookorbit.core.sync.ProgressLease>()
+    fun lease(bookId: Int) = leases[bookId]
+    fun record(bookId: Int, fileId: Int, seconds: Double, percentage: Double, lease: com.bookorbit.core.sync.ProgressLease? = leases[bookId]) {
+        if (lease != null && lease.key == "${lease.owner.userId}:audio:$bookId")
+            sync?.record(lease, com.bookorbit.core.sync.ProgressPoint(fileId, percentage, seconds = seconds))
+    }
     private val syncMutex = Mutex()
     /** Last playback-state revision seen per book - the PUT's optimistic-concurrency base. */
     private val revisions = ConcurrentHashMap<Int, Int>()
 
     suspend fun report(bookId: Int, currentFileId: Int, positionSeconds: Double, percentage: Double) {
+        if (sync != null) { record(bookId, currentFileId, positionSeconds, percentage); sync.drain(); return }
         val entity = AudioProgressEntity(bookId, currentFileId, positionSeconds, percentage, System.currentTimeMillis(), dirty = true,
             writeId = UUID.randomUUID().toString())
         dao.upsert(entity)
@@ -54,6 +62,7 @@ class AudioProgressRepository @Inject constructor(
 
     /** Push every dirty position to the server. Returns true if anything is still dirty afterward. */
     suspend fun flushPending(): Boolean = syncMutex.withLock {
+        if (sync != null) return@withLock sync.flushPending()
         for (e in dao.dirtyEntries()) {
             if (push(e)) dao.markSynced(e.bookId, e.writeId)
         }
@@ -61,20 +70,37 @@ class AudioProgressRepository @Inject constructor(
     }
 
     /** Saved positions, most recently played first (Android Auto "Continue listening" shelf). */
-    suspend fun recent(): List<AudioProgressEntity> = dao.recent()
+    suspend fun recent(): List<AudioProgressEntity> = dao.recent().filter { sync == null || sync.local("audio", it.bookId) != null }
 
-    fun observeRecent() = dao.observeRecent()
+    fun observeRecent() = sync?.let { writer -> kotlinx.coroutines.flow.combine(dao.observeRecent(), writer.owners) { rows, _ ->
+        rows.filter { writer.local("audio", it.bookId) != null }
+    } } ?: dao.observeRecent()
 
     /**
      * Resume position: retries any pending local write first, then picks whichever of local/server
      * is actually newer by timestamp (true last-write-wins, matching the server's own merge logic),
      * falling back to local if the server is unreachable and to server if there's no local row.
      */
-    suspend fun resolveResume(bookId: Int): AudioProgress? = resumePoint(bookId)?.progress
+    suspend fun resolveResume(bookId: Int, firstFileId: Int? = null, title: String = ""): AudioProgress? {
+        if (sync != null) {
+            val old = dao.get(bookId)
+            val first = firstFileId ?: old?.currentFileId ?: (assets.forBook(bookId) as? Sources.Assets)?.assetIds?.keys?.firstOrNull() ?: return null
+            val loaded = sync.open("audio", bookId, 0, title, com.bookorbit.core.sync.ProgressPoint(first, seconds = 0.0))
+            leases[bookId] = loaded.lease
+            return AudioProgress(loaded.point.fileId, loaded.point.seconds ?: 0.0, loaded.point.percentage, loaded.point.stamp)
+        }
+        return resumePoint(bookId)?.progress
+    }
 
     /** This device's saved position only - no network. Fallback when the server is slow or offline. */
-    suspend fun localResumePoint(bookId: Int): ResumePoint? =
-        dao.get(bookId)?.let { ResumePoint(it.toAudioProgress(), it.updatedAt) }
+    suspend fun localResumePoint(bookId: Int): ResumePoint? {
+        if (sync != null) return sync.local("audio", bookId)?.let { loaded ->
+            leases[bookId] = loaded.lease
+            ResumePoint(AudioProgress(loaded.point.fileId, loaded.point.seconds ?: 0.0, loaded.point.percentage, loaded.point.stamp),
+                loaded.point.stamp?.let(::epochMillis) ?: 0)
+        }
+        return dao.get(bookId)?.let { ResumePoint(it.toAudioProgress(), it.updatedAt) }
+    }
 
     /**
      * [resolveResume]'s pick plus when it was captured (epoch millis; 0 when the server gave no
@@ -82,6 +108,7 @@ class AudioProgressRepository @Inject constructor(
      * [flush] = false when looking up several books after one explicit [flushPending].
      */
     suspend fun resumePoint(bookId: Int, flush: Boolean = true): ResumePoint? {
+        if (sync != null) return resolveResume(bookId)?.let { ResumePoint(it, it.updatedAt?.let(::epochMillis) ?: 0) }
         if (flush) runCatching { flushPending() }
         val local = dao.get(bookId)
         val server = runCatching { serverProgress(bookId) }.getOrNull()

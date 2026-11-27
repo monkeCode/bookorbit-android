@@ -40,6 +40,20 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
     vm: PlayerViewModel = hiltViewModel(),
 ) {
+    val narration by vm.narration.state.collectAsStateWithLifecycle()
+    narration?.let { native ->
+        Row(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).clickable(onClick = onOpenPlayer).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(native.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.narration_edition, native.owner.fileId), style = MaterialTheme.typography.labelSmall)
+            }
+            IconButton(onClick = { vm.narration.command(native.owner, if (native.event.state == "playing") "pause" else "resume") }) {
+                Icon(if (native.event.state == "playing") Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(if (native.event.state == "playing") R.string.player_pause else R.string.player_play))
+            }
+        }
+        return
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val book = state.currentBook ?: return
     val imageUrls = LocalImageUrls.current

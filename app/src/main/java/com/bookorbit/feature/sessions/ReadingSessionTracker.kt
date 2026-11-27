@@ -50,8 +50,24 @@ class ReadingSessionTracker internal constructor(
     private var activeOwner: SessionOwner? = null
     private var lastCheckpointMs = 0L
     private var foreground = true
+    private val checkpoints = kotlinx.coroutines.channels.Channel<PendingReadingSessionEntity>(kotlinx.coroutines.channels.Channel.UNLIMITED)
 
     init {
+        scope.launch {
+            for (entity in checkpoints) {
+                while (true) {
+                    try {
+                        dao.upsert(entity)
+                        syncScheduler.schedule()
+                        break
+                    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (e: Exception) {
+                        Log.w(TAG, "Session checkpoint storage failed; retrying", e)
+                        kotlinx.coroutines.delay(1000)
+                    }
+                }
+            }
+        }
         // ProcessLifecycleOwner must be touched on the main thread.
         Handler(Looper.getMainLooper()).post {
             ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -198,10 +214,7 @@ class ReadingSessionTracker internal constructor(
             endProgress = snap.endProgress,
             userId = owner.userId,
         )
-        scope.launch {
-            dao.upsert(entity)
-            send(entity, owner.serverUrl)
-        }
+        checkpoints.trySend(entity)
     }
 
     private suspend fun send(e: PendingReadingSessionEntity, expectedServer: String) {

@@ -342,8 +342,9 @@ class MediaLibraryCallback @Inject constructor(
             if (currentCoroutineContext()[PlaybackRequestOwner]?.narrationGeneration != nativeNarration.generation())
                 throw CancellationException("Playback source changed")
             session.player.setPlaybackSpeed(resolved.speed)
-            playerManager.adoptExternalQueue(resolved.data.book, resolved.data.files, resolved.speed, resolved.speedIsPerBook, owner)
-            MediaItemsWithStartPosition(resolved.data.mediaItems, resolved.index, resolved.positionMs)
+            val queueId = ProgressQueue.id()
+            playerManager.adoptExternalQueue(resolved.data.book, resolved.data.files, resolved.speed, resolved.speedIsPerBook, owner, queueId)
+            MediaItemsWithStartPosition(ProgressQueue.tag(resolved.data.mediaItems, queueId), resolved.index, resolved.positionMs)
         }
     }
 

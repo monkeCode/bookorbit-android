@@ -24,7 +24,15 @@ class ReaderProgressRepository @Inject constructor(
     private val dao: ReaderProgressDao,
     private val api: ApiService,
     private val syncScheduler: SyncScheduler,
+    val sync: com.bookorbit.core.sync.ProgressSync? = null,
 ) {
+    private val leases = java.util.concurrent.ConcurrentHashMap<Int, com.bookorbit.core.sync.ProgressLease>()
+    fun lease(fileId: Int) = leases[fileId]
+    fun record(fileId: Int, cfi: String?, percentage: Double, pageNumber: Int? = null,
+        lease: com.bookorbit.core.sync.ProgressLease? = leases[fileId]) {
+        val writer = sync ?: return
+        if (lease != null && percentage.isFinite()) writer.record(lease, com.bookorbit.core.sync.ProgressPoint(fileId, percentage.coerceIn(0.0, 100.0), cfi, pageNumber))
+    }
     private val syncMutex = Mutex()
     suspend fun mostRecentFileId(fileIds: List<Int>): Int? = fileIds.distinct().mapNotNull { dao.get(it) }.maxByOrNull { it.updatedAt }?.fileId
     /**
@@ -32,6 +40,7 @@ class ReaderProgressRepository @Inject constructor(
      * persisted alongside CFI + percentage so offline retries retain PDF/comic coordinates.
      */
     suspend fun report(fileId: Int, cfi: String?, percentage: Double, pageNumber: Int? = null) {
+        if (sync != null) { record(fileId, cfi, percentage, pageNumber); sync.drain(); return }
         val entry = ReaderProgressEntity(fileId, cfi, percentage, System.currentTimeMillis(), dirty = true,
             pageNumber = pageNumber, writeId = UUID.randomUUID().toString())
         dao.upsert(entry)
@@ -43,6 +52,7 @@ class ReaderProgressRepository @Inject constructor(
 
     /** Push every dirty position to the server. Returns true if anything is still dirty afterward. */
     suspend fun flushPending(): Boolean = syncMutex.withLock {
+        if (sync != null) return@withLock sync.flushPending()
         for (entry in dao.dirtyEntries()) {
             if (push(entry)) dao.markSynced(entry.fileId, entry.writeId)
         }
@@ -60,6 +70,11 @@ class ReaderProgressRepository @Inject constructor(
 
     /** Do not let a web reader start behind a pending offline position for this file. */
     suspend fun syncBeforeWeb(fileId: Int) = syncMutex.withLock {
+        if (sync != null) {
+            sync.flushPending()
+            check(!sync.isPending(checkNotNull(leases[fileId]))) { "Resolve the book's pending position before opening the server reader" }
+            return@withLock
+        }
         val local = dao.get(fileId) ?: return@withLock
         if (!local.dirty) return@withLock
         api.saveFileProgress(fileId, SaveFileProgress(local.cfi, local.percentage, local.pageNumber))
@@ -73,7 +88,12 @@ class ReaderProgressRepository @Inject constructor(
      * Where to resume: a not-yet-synced local position wins (most recent reading), otherwise the
      * server's, otherwise the start.
      */
-    suspend fun resolveInitial(fileId: Int): InitialProgress {
+    suspend fun resolveInitial(fileId: Int, bookId: Int? = null, title: String = ""): InitialProgress {
+        if (sync != null && bookId != null) {
+            val loaded = sync.open("text", bookId, fileId, title, com.bookorbit.core.sync.ProgressPoint(fileId))
+            leases[fileId] = loaded.lease
+            return InitialProgress(loaded.point.cfi, loaded.point.percentage / 100.0, loaded.point.page)
+        }
         val local = dao.get(fileId)
         val server = runCatching { api.getFileProgress(fileId) }.getOrNull()
 

@@ -49,6 +49,16 @@ internal class NativeNarrationPlayer(
         return true
     }
 
+    fun seekToCheckpoint(position: ReadAlongPosition): Boolean {
+        if (!allowed() || !position.valid()) return false
+        val matches = queue.plan.timeline.clips.filter { it.sectionIndex == position.sectionIndex && it.fragment == position.fragment &&
+            it.audioHref == position.audioSrc && position.audioSeconds >= it.clipBeginSeconds &&
+            (it.clipEndSeconds == null || position.audioSeconds < it.clipEndSeconds || it.index == queue.plan.timeline.clips.lastIndex && position.audioSeconds == it.clipEndSeconds) }
+        val clip = matches.singleOrNull() ?: return false
+        super.seekTo(clip.index, ((position.audioSeconds - clip.clipBeginSeconds) * 1000).toLong())
+        return true
+    }
+
     // System next/previous advances actual SMIL sections, skipping un-narrated text sections.
     override fun seekToNext() = nextChapter()
     override fun seekToNextMediaItem() = nextChapter()

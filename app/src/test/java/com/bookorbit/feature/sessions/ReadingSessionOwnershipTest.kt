@@ -38,7 +38,7 @@ class ReadingSessionOwnershipTest {
 
     @Test fun `closing after account switch preserves the owner captured at activity start`() = runTest {
         val dao = Dao(); val session = session(); val api = api(); var now = 0L
-        val tracker = ReadingSessionTracker(dao, api, mockk<SyncScheduler>(relaxed = true), session, this) { now }
+        val tracker = ReadingSessionTracker(dao, api, mockk<SyncScheduler>(relaxed = true), session, backgroundScope) { now }
         tracker.beginReading(9, 0.0)
         now = 30_000
         session.signIn("second-token", second)
@@ -50,7 +50,7 @@ class ReadingSessionOwnershipTest {
 
     @Test fun `closing after logout must not turn an owned snapshot into an unowned legacy row`() = runTest {
         val dao = Dao(); val session = session(); val api = api(); var now = 0L
-        val tracker = ReadingSessionTracker(dao, api, mockk<SyncScheduler>(relaxed = true), session, this) { now }
+        val tracker = ReadingSessionTracker(dao, api, mockk<SyncScheduler>(relaxed = true), session, backgroundScope) { now }
         tracker.beginReading(9, 0.0)
         now = 30_000
         session.signOut()
@@ -62,7 +62,7 @@ class ReadingSessionOwnershipTest {
 
     @Test fun `identical file IDs in different accounts cannot share one open session`() = runTest {
         val dao = Dao(); val session = session(); val api = api(); var now = 0L
-        val tracker = ReadingSessionTracker(dao, api, mockk<SyncScheduler>(relaxed = true), session, this) { now }
+        val tracker = ReadingSessionTracker(dao, api, mockk<SyncScheduler>(relaxed = true), session, backgroundScope) { now }
         tracker.beginReading(9, 0.0)
         now = 30_000
         session.signIn("second-token", second)
@@ -76,7 +76,7 @@ class ReadingSessionOwnershipTest {
 
     @Test fun `background narration survives closing the reader and counts each elapsed second only once`() = runTest {
         val dao = Dao(); val session = session(); var now = 0L
-        val tracker = ReadingSessionTracker(dao, api(), mockk<SyncScheduler>(relaxed = true), session, this) { now }
+        val tracker = ReadingSessionTracker(dao, api(), mockk<SyncScheduler>(relaxed = true), session, backgroundScope) { now }
         val reader = tracker.beginReading(9, 10.0)!!
         now = 20_000
         val narration = tracker.beginNarration(9, session.owner()!!)!!
@@ -94,7 +94,7 @@ class ReadingSessionOwnershipTest {
 
     @Test fun `paused narration returns to foreground reading through disjoint read listen read intervals`() = runTest {
         val dao = Dao(); val session = session(); var now = 0L
-        val tracker = ReadingSessionTracker(dao, api(), mockk<SyncScheduler>(relaxed = true), session, this) { now }
+        val tracker = ReadingSessionTracker(dao, api(), mockk<SyncScheduler>(relaxed = true), session, backgroundScope) { now }
         val reader = tracker.beginReading(9, 10.0)!!
         now = 20_000
         val narration = tracker.beginNarration(9, session.owner()!!)!!
@@ -111,7 +111,7 @@ class ReadingSessionOwnershipTest {
 
     @Test fun `a cleared old reader cannot close or change the new readers exact file progress`() = runTest {
         val dao = Dao(); val session = session(); var now = 0L
-        val tracker = ReadingSessionTracker(dao, api(), mockk<SyncScheduler>(relaxed = true), session, this) { now }
+        val tracker = ReadingSessionTracker(dao, api(), mockk<SyncScheduler>(relaxed = true), session, backgroundScope) { now }
         val old = tracker.beginReading(9, 0.0)!!
         now = 20_000; val current = tracker.beginReading(10, 10.0)!!
         now = 30_000; tracker.onReadingProgress(old, 90.0); tracker.endReading(old)

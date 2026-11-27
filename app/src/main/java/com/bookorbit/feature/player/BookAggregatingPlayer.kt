@@ -181,6 +181,8 @@ class BookAggregatingPlayer(
 
     fun filePositionMs(): Long = super.getCurrentPosition()
     fun hasCurrentSourceQueue(): Boolean = sourceQueue == null || currentSourceItems() != null
+    internal fun progressQueueId(): String? = (currentSourceItems()?.getOrNull(currentMediaItemIndex)
+        ?: currentMediaItem)?.mediaMetadata?.extras?.getString(ProgressQueue.EXTRA)
     fun bookPositionMs(): Long = absoluteMs(filePositionMs())
     fun bookBufferedPositionMs(): Long = absoluteMs(super.getBufferedPosition())
     fun bookDurationMs(): Long = clock().bookDurationMs

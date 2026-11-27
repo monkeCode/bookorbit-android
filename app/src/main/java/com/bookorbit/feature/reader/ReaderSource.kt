@@ -30,6 +30,12 @@ class ReaderSource @Inject constructor(
 ) {
     data class ResolvedFile(val ref: LocalRef, val format: String, val fileId: Int)
 
+    suspend fun availableFile(bookId: Int, ref: BookFileRef): ResolvedFile? = withContext(Dispatchers.IO) {
+        offlineFile(bookId, ref) ?: File(context.cacheDir,
+            "reader-cache-v2/${session.dataScope.ifEmpty { "owner" }}/${session.currentUser?.id ?: 0}/$bookId-${ref.id}.${ref.format.orEmpty().lowercase()}")
+            .takeIf { it.isFile }?.let { ResolvedFile(LocalRef.PlainFile(it), ref.format.orEmpty().lowercase(), ref.id) }
+    }
+
     suspend fun offlineFile(bookId: Int, ref: BookFileRef): ResolvedFile? = withContext(Dispatchers.IO) {
         downloads.localFiles(bookId)[ref.id]?.let { path ->
             val local = LocalRef.parse(path)

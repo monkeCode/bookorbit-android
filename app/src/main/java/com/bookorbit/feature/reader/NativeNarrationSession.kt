@@ -9,12 +9,14 @@ import javax.inject.Singleton
 /** In-process service port: no credentials, media URLs or queues cross a public intent. */
 @Singleton
 class NativeNarrationSession @Inject constructor() {
-    data class State(val owner: ReadAlongOwner, val bookId: Int, val event: ReaderEvent.ReadAlong)
+    data class State(val owner: ReadAlongOwner, val bookId: Int, val event: ReaderEvent.ReadAlong,
+        val title: String = "", val seconds: Double? = null, val duration: Double? = null)
     internal interface Port {
         fun start(queue: NativeNarrationQueue, owner: ReadAlongOwner, saved: ReadAlongPosition?, section: Int)
         fun command(action: String, rate: Double?)
         fun listenFrom(position: ReadAlongPosition): Boolean = false
         fun leave()
+        fun seekTo(seconds: Double) {}
     }
     private var port: Port? = null
     @Volatile private var generation = 0L
@@ -46,4 +48,5 @@ class NativeNarrationSession @Inject constructor() {
         return accepted
     }
     @MainThread internal fun leaveForAudiobook() { generation++; port?.leave(); mutableState.value = null }
+    @MainThread fun seekTo(owner: ReadAlongOwner, seconds: Double) { if (mutableState.value?.owner == owner) port?.seekTo(seconds) }
 }

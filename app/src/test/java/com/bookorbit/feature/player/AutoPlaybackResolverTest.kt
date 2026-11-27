@@ -14,7 +14,9 @@ import org.junit.Test
 
 class AutoPlaybackResolverTest {
     private val repository = mockk<PlayerRepository>()
-    private val progress = mockk<AudioProgressRepository>(relaxed = true)
+    private val progress = mockk<AudioProgressRepository>(relaxed = true) {
+        io.mockk.every { sync } returns null
+    }
     private val candidates = mockk<RestoreCandidateFinder>()
     private val settings = mockk<AudioSettingsStore> {
         coEvery { load() } returns AudioSettings(speed = 1.25f)

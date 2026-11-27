@@ -49,6 +49,7 @@ class ReaderHostViewModel @Inject constructor(
             ReaderKind.PDF -> (target as? BookFiles.ReadingTarget.Pdf)?.file
             ReaderKind.COMIC -> (target as? BookFiles.ReadingTarget.Comic)?.file
         })
+        progress.resolveInitial(file.id, bookId, book.title.orEmpty())
         progress.syncBeforeWeb(file.id)
         check(session.owns(owner))
         lastEditions.record(owner, bookId, file.id)

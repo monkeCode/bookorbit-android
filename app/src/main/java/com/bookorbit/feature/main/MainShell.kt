@@ -247,6 +247,7 @@ fun MainShell(
                       onReadPdf = onOpenPdf,
                       onReadComic = onOpenComic,
                       onListen = onListen,
+                      onOpenPlayer = onOpenPlayer,
                       // "More by this author" / "Similar books" stay in the pane.
                       onBookClick = onListBookClick,
                       onAuthorClick = onAuthorClick,
@@ -344,6 +345,7 @@ fun MainShell(
                     onReadPdf = onOpenPdf,
                     onReadComic = onOpenComic,
                     onListen = onListen,
+                    onOpenPlayer = onOpenPlayer,
                     onBookClick = onBookClick,
                     onAuthorClick = onAuthorClick,
                     onSeriesClick = onSeriesClick,

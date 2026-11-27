@@ -69,6 +69,13 @@ import retrofit2.http.Tag
  * Endpoints mirror the server's `/api/v1` REST surface one-to-one.
  */
 interface ApiService {
+    @GET("reading-progress")
+    suspend fun readingPositions(@Query("fileId") fileId: Int,
+        @Tag owner: com.bookorbit.core.auth.SessionOwner): com.bookorbit.core.model.ReadingPositionList
+
+    @PUT("reading-progress")
+    suspend fun writeReadingPositions(@Body body: com.bookorbit.core.model.ReadingPositionWrites,
+        @Tag owner: com.bookorbit.core.auth.SessionOwner): com.bookorbit.core.model.ReadingPositionResults
     @POST("mobile/vision-scan")
     suspend fun probeVisionScan(@Body request: kotlinx.serialization.json.JsonObject): Response<ResponseBody>
 
@@ -275,12 +282,13 @@ interface ApiService {
      * returned raw because the JSON converter can't decode an empty 200 body.
      */
     @GET("audiobooks/{bookId}/playback-state")
-    suspend fun getPlaybackState(@Path("bookId") bookId: Int): ResponseBody
+    suspend fun getPlaybackState(@Path("bookId") bookId: Int, @Tag owner: com.bookorbit.core.auth.SessionOwner? = null): ResponseBody
 
     @PUT("audiobooks/{bookId}/playback-state")
     suspend fun putPlaybackState(
         @Path("bookId") bookId: Int,
         @Body body: PutAudiobookPlaybackState,
+        @Tag owner: com.bookorbit.core.auth.SessionOwner? = null,
     ): AudiobookPlaybackState
 
     /** Cover image bytes, for caching a downloaded book's cover offline. */
@@ -289,7 +297,7 @@ interface ApiService {
     suspend fun serveCover(@Path("id") id: Int): ResponseBody
 
     @GET("books/{id}/audio-progress")
-    suspend fun getAudioProgress(@Path("id") id: Int): AudioProgress?
+    suspend fun getAudioProgress(@Path("id") id: Int, @Tag owner: com.bookorbit.core.auth.SessionOwner? = null): AudioProgress?
 
     @PATCH("books/{id}/audio-progress")
     suspend fun saveAudioProgress(

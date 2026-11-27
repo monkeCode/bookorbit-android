@@ -10,7 +10,8 @@ import kotlin.math.roundToLong
 
 /** One native item per exact SMIL clip; queue construction never starts playback. */
 @androidx.annotation.OptIn(UnstableApi::class)
-internal class NativeNarrationQueue(val plan: NativeNarrationSource, title: String, author: String? = null) {
+internal class NativeNarrationQueue(val plan: NativeNarrationSource, val title: String, author: String? = null,
+    val progressLease: com.bookorbit.core.sync.ProgressLease? = null) {
     val id = UUID.randomUUID().toString()
     val items = plan.timeline.clips.map { clip ->
         val startMs = (clip.clipBeginSeconds * 1000).roundToLong()

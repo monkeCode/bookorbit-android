@@ -76,6 +76,7 @@ class PlaybackService : MediaLibraryService() {
 
     @Inject lateinit var downloads: DownloadsRepository
     @Inject lateinit var audioProgress: AudioProgressRepository
+    @Inject lateinit var positions: com.bookorbit.core.sync.ProgressSync
     @Inject lateinit var nativeNarration: com.bookorbit.feature.reader.NativeNarrationSession
     @Inject lateinit var narrationPositions: com.bookorbit.feature.reader.ReadAlongPositionStore
     @Inject lateinit var readingActivities: com.bookorbit.feature.sessions.ReadingSessionTracker
@@ -108,6 +109,7 @@ class PlaybackService : MediaLibraryService() {
             beforePlay = ::ensureForegroundBeforePlay,
             beforeNarration = { check(!usingCast); activeBookPlayer.current?.detach(); activeBookPlayer.current = null },
             restoreAudiobook = { mediaSession?.setPlayer(wrap(player)) },
+            progress = positions,
         ).also(nativeNarration::bind)
 
         serviceScope.launch {
@@ -236,12 +238,14 @@ class PlaybackService : MediaLibraryService() {
     override fun onTaskRemoved(rootIntent: android.content.Intent?) {
         // Stop the service if the user swipes the app away while paused.
         val sessionPlayer = mediaSession?.player
-        if (sessionPlayer == null || !sessionPlayer.playWhenReady || sessionPlayer.mediaItemCount == 0) {
+        if (sessionPlayer == null || !sessionPlayer.playWhenReady || sessionPlayer.mediaItemCount == 0 ||
+            sessionPlayer.playerError != null || sessionPlayer.playbackState == androidx.media3.common.Player.STATE_IDLE) {
             stopSelf()
         }
     }
 
     override fun onDestroy() {
+        playerManager.checkpointBeforeRelease()
         narrationPlayback?.let { it.release(); nativeNarration.unbind(it) }
         narrationPlayback = null
         serviceScope.cancel()

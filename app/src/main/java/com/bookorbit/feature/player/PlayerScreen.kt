@@ -72,6 +72,8 @@ fun PlayerScreen(
     onBack: () -> Unit,
     vm: PlayerViewModel = hiltViewModel(),
 ) {
+    val narration by vm.narration.state.collectAsStateWithLifecycle()
+    narration?.let { NativeAudioPlayer(it, vm.narration, onBack); return }
     val state by vm.state.collectAsStateWithLifecycle()
     val imageUrls = LocalImageUrls.current
     var scrubbing by remember { mutableStateOf<Float?>(null) }

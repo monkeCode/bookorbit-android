@@ -30,6 +30,9 @@ class AutoPlaybackResolver @Inject constructor(
         if (data.files.isEmpty()) return null
         val bookSpeed = settings.bookSpeed(bookId)
         val speed = resolveSpeed(settings.load().speed, bookSpeed)
+        val checked = if (progress.sync != null) withTimeoutOrNull(5_000) {
+            progress.resolveResume(bookId, data.files.first().id, data.book.title.orEmpty())
+        } ?: progress.localResumePoint(bookId)?.progress else null
         fun result(index: Int, positionMs: Long) = Resolved(data, index, positionMs, speed, bookSpeed != null)
         if (chapterIndex != null) {
             val total = PlaybackQueue.totalDurationSec(data.files)
@@ -38,11 +41,11 @@ class AutoPlaybackResolver @Inject constructor(
             val location = PlaybackQueue.locateAbsolute(data.files, chapter.startSec)
             return result(location.index, (location.offsetSec * 1000).toLong())
         }
-        val point = resume ?: withTimeoutOrNull(4_000) { progress.resolveResume(bookId) }
+        val point = checked ?: resume.takeIf { progress.sync == null } ?: withTimeoutOrNull(4_000) { progress.resolveResume(bookId) }
             ?: progress.localResumePoint(bookId)?.progress
         val index = data.files.indexOfFirst { it.id == point?.currentFileId }
         // A removed/replaced file must not apply its old offset to the first file of a new edition.
-        if (index < 0) return result(0, 0)
+        if (index < 0) return if (progress.sync != null && point != null) null else result(0, 0)
         val seconds = (point?.positionSeconds ?: 0.0).takeIf { it.isFinite() }?.coerceAtLeast(0.0) ?: 0.0
         val duration = data.files[index].durationSeconds?.takeIf { it > 0 }
         return result(index, ((duration?.let { seconds.coerceAtMost(it) } ?: seconds) * 1000).toLong())

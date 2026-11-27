@@ -34,6 +34,7 @@ fun AuthenticatedApp(user: AuthUser, onSignOut: () -> Unit) {
     // Reopen the last audiobook (paused) so the mini-player survives the app being closed. The
     // manager makes this a once-per-process no-op, so recompositions and recreations are harmless.
     LaunchedEffect(Unit) { playerVm.restoreLastBook() }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { playerVm.restoreLastBook() }
 
     NavHost(navController = navController, startDestination = AppRoutes.MAIN) {
         composable(AppRoutes.MAIN) {
@@ -74,6 +75,7 @@ fun AuthenticatedApp(user: AuthUser, onSignOut: () -> Unit) {
             PlayerScreen(onBack = dropUnlessResumed { navController.popBackStack() })
         }
     }
+    com.bookorbit.core.sync.PositionConflicts()
 }
 
 private fun readerArguments() = listOf(

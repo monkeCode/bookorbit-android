@@ -15,6 +15,7 @@ import { makeStreamingBook } from './foliate/view.js';
 import { chapterSurfaceCSS, applyCanvasTheme } from './appearance.js';
 import { ReadAlongController } from './read-along.js';
 import { extractChatContext } from './chat-context.js';
+import * as CFI from './foliate/epubcfi.js';
 
 const container = document.getElementById('reader');
 
@@ -22,6 +23,9 @@ const container = document.getElementById('reader');
 let currentSettings = null;
 /** The <foliate-view> element, once created. */
 let view = null;
+let userProgress = false;
+let navigationIntent = false;
+let nativeFragment = null;
 /** Base64 transfer state for the book currently being opened. */
 let pending = null;
 const readAlong = new ReadAlongController(post);
@@ -339,6 +343,8 @@ function clearSelection() {
  * blocked text selection), so taps are detected here and reported with their horizontal position.
  */
 function attachDocHandlers(doc, index) {
+  for (const name of ['pointerdown', 'touchstart', 'wheel', 'keydown'])
+    doc.addEventListener(name, () => { userProgress = true; }, { passive: true });
   let selectionAtPointerDown = false;
   let selectionTimer = null;
 
@@ -447,8 +453,10 @@ function createView() {
       fraction: typeof d.fraction === 'number' ? d.fraction : null,
       chapterTitle: d.tocItem?.label ?? null,
       sectionIndex: Number.isInteger(d.sectionIndex) ? d.sectionIndex : null,
+      movedByUser: (userProgress && ['page', 'snap', 'scroll'].includes(d.reason)) || (navigationIntent && d.reason === 'navigation'),
       location: d.location ?? null,
     });
+    if (d.reason === 'navigation') { navigationIntent = false; userProgress = false; }
   });
 
   view.addEventListener('error', (e) => {
@@ -478,6 +486,9 @@ const MIME = {
 };
 
 async function openBook(meta, parts) {
+  userProgress = false;
+  navigationIntent = false;
+  nativeFragment = null;
   try {
     createView();
     const format = (meta.format ?? 'epub').toLowerCase();
@@ -570,6 +581,25 @@ window.__readerCommand = (json) => {
     return;
   }
   switch (cmd.type) {
+    case 'restorePosition':
+      userProgress = false;
+      navigationIntent = false;
+      void (async () => {
+        try {
+          if (cmd.cfi) {
+            const target = view.resolveCFI(cmd.cfi);
+            const doc = await view.book.sections[target.index].createDocument();
+            const range = target.anchor(doc);
+            if (CFI.compare(view.getCFI(target.index, range), cmd.cfi) !== 0) throw Error('Changed position');
+            await view.goTo(cmd.cfi);
+            if (view.lastLocation?.sectionIndex !== target.index) throw Error('Different section');
+          }
+          else if (typeof cmd.fraction === 'number') await view.goToFraction(cmd.fraction);
+          else throw Error('Missing position');
+          post({ type: 'positionRestored', ticket: cmd.ticket, success: true });
+        } catch { post({ type: 'positionRestored', ticket: cmd.ticket, success: false }); }
+      })();
+      break;
     case 'chatContext': {
       const currentView = view;
       void extractChatContext(currentView, cmd).then(context => {
@@ -581,21 +611,34 @@ window.__readerCommand = (json) => {
       break;
     }
     case 'readAlong':
+      userProgress = false;
+      navigationIntent = false;
       void readAlong.command(cmd.action, cmd.rate);
       break;
     case 'nativeReadAlong':
+      if (cmd.position?.fragment !== nativeFragment) {
+        userProgress = false; navigationIntent = false; nativeFragment = cmd.position?.fragment ?? null;
+      }
       readAlong.followNative(cmd.position);
       break;
     case 'goTo':
+      userProgress = true;
+      navigationIntent = true;
       void view.goTo(cmd.target).catch(() => {});
       break;
     case 'goToFraction':
+      userProgress = true;
+      navigationIntent = true;
       if (typeof view.goToFraction === 'function') view.goToFraction(cmd.value);
       break;
     case 'prev':
+      userProgress = true;
+      navigationIntent = true;
       view.prev?.();
       break;
     case 'next':
+      userProgress = true;
+      navigationIntent = true;
       view.next?.();
       break;
     case 'applyStyles':

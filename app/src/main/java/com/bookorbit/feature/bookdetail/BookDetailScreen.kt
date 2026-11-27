@@ -93,6 +93,7 @@ fun BookDetailScreen(
     onAuthorClick: (id: Int, name: String) -> Unit,
     onSeriesClick: (id: Int, name: String) -> Unit,
     vm: BookDetailViewModel = hiltViewModel(),
+    onOpenPlayer: () -> Unit = {},
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val collections by vm.collections.collectAsStateWithLifecycle()
@@ -100,6 +101,11 @@ fun BookDetailScreen(
     var collectionSheet by remember { mutableStateOf(false) }
     var downloadSheet by rememberSaveable { mutableStateOf(false) }
     var pendingDownloadIds by rememberSaveable { mutableStateOf(arrayListOf<Int>()) }
+    var audioChooser by remember { mutableStateOf(false) }
+    val audioEditions by vm.audioEditions.collectAsStateWithLifecycle()
+    val audioLoading by vm.audioLoading.collectAsStateWithLifecycle()
+    val audioStarting by vm.audioStarting.collectAsStateWithLifecycle()
+    val audioFailed by vm.audioFailed.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -148,7 +154,10 @@ fun BookDetailScreen(
                     onRead = onRead,
                     onReadPdf = onReadPdf,
                     onReadComic = onReadComic,
-                    onListen = onListen,
+                    onListen = { id ->
+                        if (ui.book?.files?.any { it.format.equals("epub", true) } == true) { audioChooser = true; vm.discoverAudio() }
+                        else onListen(id)
+                    },
                     onBookClick = onBookClick,
                     onAuthorClick = onAuthorClick,
                     onSeriesClick = onSeriesClick,
@@ -161,6 +170,17 @@ fun BookDetailScreen(
     }
 
     val book = ui.book
+    if (audioChooser && book != null) androidx.compose.material3.AlertDialog(onDismissRequest = { if (!audioStarting) { vm.cancelAudioDiscovery(); audioChooser = false } },
+        title = { Text(stringResource(R.string.narration_editions)) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (BookFiles.isAudiobook(book)) androidx.compose.material3.TextButton(enabled = !audioStarting, onClick = { vm.cancelAudioDiscovery(); audioChooser = false; onListen(book.id) }) { Text(stringResource(R.string.sync_audio)) }
+            audioEditions.forEach { edition -> androidx.compose.material3.TextButton(enabled = !audioStarting, onClick = {
+                vm.playNarration(edition) { audioChooser = false; onOpenPlayer() }
+            }) { Text(stringResource(R.string.narration_edition, edition.fileId)) } }
+            if (audioLoading || audioStarting) CircularProgressIndicator()
+            else if (audioEditions.isEmpty()) Text(stringResource(R.string.narration_no_editions))
+            if (audioFailed) Text(stringResource(R.string.player_err_load), color = MaterialTheme.colorScheme.error)
+        } }, confirmButton = { androidx.compose.material3.TextButton(onClick = { vm.cancelAudioDiscovery(); audioChooser = false }, enabled = !audioStarting) { Text(stringResource(R.string.cancel)) } })
     if (book != null && downloadSheet) {
         val download by vm.downloadState.collectAsStateWithLifecycle()
         DownloadSelectionDialog(book, confirmDownload, onDismiss = { downloadSheet = false }, existingFileIds = vm.downloadedFileIds(download))
@@ -204,7 +224,7 @@ private fun BookDetailContent(
 ) {
     val imageUrls = LocalImageUrls.current
     val uriHandler = LocalUriHandler.current
-    val canListen = BookFiles.isAudiobook(book)
+    val canListen = BookFiles.isAudiobook(book) || book.files.any { it.format.equals("epub", true) }
     val readingTarget = BookFiles.readingTarget(book)
     val canRead = readingTarget != BookFiles.ReadingTarget.None
     val goodreadsId = book.providerIds["goodreads"]

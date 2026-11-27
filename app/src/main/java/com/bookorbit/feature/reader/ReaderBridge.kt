@@ -34,6 +34,7 @@ data class ViewportRect(val left: Double, val top: Double, val right: Double, va
 data class SearchHit(val cfi: String, val pre: String, val match: String, val post: String)
 
 sealed interface ReaderEvent {
+    data class PositionRestored(val ticket: String, val success: Boolean) : ReaderEvent
     data class ChatContext(val requestId: String, val context: com.bookorbit.feature.readinghelp.ReaderChatContext?, val problem: String?) : ReaderEvent
     data object Ready : ReaderEvent
     data class Loaded(val toc: List<TocItem>, val title: String?, val rightToLeft: Boolean = false) : ReaderEvent
@@ -42,6 +43,7 @@ sealed interface ReaderEvent {
         val fraction: Double?,
         val chapterTitle: String?,
         val sectionIndex: Int? = null,
+        val movedByUser: Boolean = true,
     ) : ReaderEvent
     data class Error(val message: String) : ReaderEvent
     data class ReadAlong(val available: Boolean, val state: String, val rate: Double = 1.0, val error: String? = null,
@@ -94,6 +96,8 @@ object ReaderBridge {
     fun parseEvent(data: String): ReaderEvent? = runCatching {
         val obj = json.parseToJsonElement(data).jsonObject
         when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+            "positionRestored" -> ReaderEvent.PositionRestored(obj.getValue("ticket").jsonPrimitive.content,
+                obj["success"]?.jsonPrimitive?.booleanOrNull == true)
             "chatContext" -> ReaderEvent.ChatContext(
                 obj.getValue("requestId").jsonPrimitive.content,
                 obj["context"]?.let { json.decodeFromJsonElement(com.bookorbit.feature.readinghelp.ReaderChatContext.serializer(), it).also { context -> context.validate() } },
@@ -123,6 +127,7 @@ object ReaderBridge {
                 fraction = obj["fraction"]?.jsonPrimitive?.doubleOrNull,
                 chapterTitle = obj["chapterTitle"]?.jsonPrimitive?.contentOrNull,
                 sectionIndex = obj["sectionIndex"]?.jsonPrimitive?.intOrNull?.takeIf { it in 0..100_000 },
+                movedByUser = obj["movedByUser"]?.jsonPrimitive?.booleanOrNull ?: false,
             )
             "error" -> ReaderEvent.Error(obj["message"]?.jsonPrimitive?.contentOrNull ?: "Reader error")
             "tap" -> obj["x"]?.jsonPrimitive?.doubleOrNull?.let { ReaderEvent.Tap(it) }

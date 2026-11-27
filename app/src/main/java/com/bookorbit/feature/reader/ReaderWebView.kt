@@ -124,6 +124,9 @@ class ReaderController {
     fun open(params: OpenParams, context: Context) = runOpen(params, context)
 
     fun goTo(target: String) = command(buildJsonObject { put("type", "goTo"); put("target", target) }.toString())
+    fun restorePosition(cfi: String?, fraction: Double, ticket: String) = command(buildJsonObject {
+        put("type", "restorePosition"); put("ticket", ticket); if (cfi != null) put("cfi", cfi); put("fraction", fraction)
+    }.toString())
     fun goToFraction(value: Double) = command(buildJsonObject { put("type", "goToFraction"); put("value", value) }.toString())
     fun next() = command(buildJsonObject { put("type", "next") }.toString())
     fun prev() = command(buildJsonObject { put("type", "prev") }.toString())

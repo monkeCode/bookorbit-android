@@ -14,6 +14,7 @@
 import { makeStreamingBook } from './foliate/view.js';
 import { chapterSurfaceCSS, applyCanvasTheme } from './appearance.js';
 import { ReadAlongController } from './read-along.js';
+import { extractChatContext } from './chat-context.js';
 
 const container = document.getElementById('reader');
 
@@ -569,6 +570,16 @@ window.__readerCommand = (json) => {
     return;
   }
   switch (cmd.type) {
+    case 'chatContext': {
+      const currentView = view;
+      void extractChatContext(currentView, cmd).then(context => {
+        if (view === currentView) post({ type: 'chatContext', requestId: cmd.requestId, context });
+      }).catch(error => {
+        if (view === currentView) post({ type: 'chatContext', requestId: cmd.requestId,
+          problem: error?.message === 'too_long' ? 'too_long' : 'boundary' });
+      });
+      break;
+    }
     case 'readAlong':
       void readAlong.command(cmd.action, cmd.rate);
       break;

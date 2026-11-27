@@ -1,8 +1,29 @@
-# BookOrbit 3.9.0 AI compatibility
+# BookOrbit AI compatibility
 
-Audited against the upstream `v3.9.0` source, not inferred from iOS screenshots.
+The original server audit below covers upstream `v3.9.0`, not inferred iOS screenshots.
+Reading Help was rechecked against `v3.10.0` for the [direct reader chat](READER_CHAT.md).
 All paths below are relative to `/api/v1`. Existing JWT and library permissions
 still apply; an allowed metadata request does not imply access to AI content.
+
+## Direct chat and optional secondary provider (November 27, 2026)
+
+AI settings can keep the server as primary and separately enable a direct provider.
+Persistent reader chat uses that provider without probing server AI. Optional short
+Reading Help fallback applies only after a failed content-free availability probe,
+with route-pinned consent; submitted model requests never fall back or auto-replay.
+Photo search and Story Guide do not acquire direct-provider implementations.
+
+In v3.10.0, `mobile/reading-help` still accepts only `term`, `description`,
+`recap-note` and `recap-stop`; there are no question/messages fields. The server
+prompts require short plain prose, and `cleanAnswer()` removes bold markers. This
+contract is not reused to masquerade as arbitrary multi-turn chat. The upstream
+Android fork had no matching Reading Help/chat integration in the audited tree.
+
+Source: [v3.10.0 shared contract](https://github.com/bookorbit/bookorbit/blob/v3.10.0/packages/types/src/reading-help.ts)
+and [server prompts](https://github.com/bookorbit/bookorbit/blob/v3.10.0/server/src/modules/reading-help/reading-help-prompts.ts).
+
+See [reader chat](READER_CHAT.md) for exact boundary semantics, local-revision
+requirements, persistence, Markdown, note saving and current context limits.
 
 | Feature | Server contract | Independent client in production |
 | --- | --- | --- |

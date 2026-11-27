@@ -30,6 +30,45 @@ class CustomAiConnectionUiTest {
     @Test fun ollamaWithoutTokenRequiresHttpOptInAndAddressSpecificConsent() = exercise(AiProvider.OLLAMA)
     @Test fun compatibleWithoutTokenUsesConfiguredApiPrefix() = exercise(AiProvider.OPENAI_COMPATIBLE)
 
+    @Test fun serverAndAdditionalDirectProviderPersistTogetherWithoutMakingARequest() {
+        val context = compose.activity
+        val name = "combined-ai-ui-${UUID.randomUUID()}"
+        val alias = "$name-key"
+        try {
+            val storage = SecureStorage(context, name, alias, "$name-owner")
+            val session = SessionManager(storage, Json).apply {
+                setServerUrl("https://fixture.example"); signIn("synthetic", AuthUser(1, "fixture"))
+            }
+            val store = AiConnectionStore(storage, session)
+            MockWebServer().use { endpoint ->
+                var shown by mutableStateOf(true)
+                compose.setContent { MaterialTheme { if (shown) AiConnectionDialog(store, session.owner()) { shown = false } } }
+                compose.onNodeWithTag("ai-extra-direct").performScrollTo().performClick()
+                compose.onNodeWithTag("ai-fallback-direct").performScrollTo().performClick()
+                compose.onNodeWithText(AiProvider.OPENAI.displayName).performScrollTo().performClick()
+                compose.onNodeWithText(AiProvider.OPENAI_COMPATIBLE.displayName).performClick()
+                compose.onNodeWithText(context.getString(R.string.ai_base_url)).performScrollTo().performTextReplacement(endpoint.url("/v1/").toString())
+                compose.onNodeWithText(context.getString(R.string.ai_help_model)).performScrollTo().performTextInput("fixture-model")
+                androidx.test.espresso.Espresso.closeSoftKeyboard()
+                // Only the custom HTTP checkbox remains unchecked; explicit opt-in is mandatory.
+                compose.onNodeWithTag("ai-http").performScrollTo().performClick()
+                compose.onNodeWithText(context.getString(R.string.ai_save)).performClick()
+                compose.runOnIdle {
+                    assertFalse(shown)
+                    val value = store.connection(session.owner()!!)
+                    assertEquals(AiRoute.SERVER, value.route)
+                    assertTrue(value.directEnabled); assertTrue(value.fallbackToDirect)
+                    assertEquals("fixture-model", value.helpModel)
+                    assertEquals(0, endpoint.requestCount)
+                }
+            }
+        } finally {
+            context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+            context.deleteSharedPreferences(name); context.deleteSharedPreferences("$name-owner")
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
+        }
+    }
+
     private fun exercise(provider: AiProvider) {
         val context = compose.activity
         val diagnostics = com.bookorbit.core.diagnostics.DiagnosticLog(context)

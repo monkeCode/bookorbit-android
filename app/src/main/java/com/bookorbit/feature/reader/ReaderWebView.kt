@@ -59,6 +59,25 @@ private const val CHUNK_BYTES = CHUNK_CHARS / 4 * 3
  * protocol, buffering an open requested before the bridge signals ready.
  */
 class ReaderController {
+    private val contextRequests = mutableMapOf<String, kotlinx.coroutines.CompletableDeferred<ReaderEvent.ChatContext>>()
+
+    suspend fun chatContext(scope: String, selectionCfi: String? = null): com.bookorbit.feature.readinghelp.ReaderChatContext =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            val id = java.util.UUID.randomUUID().toString()
+            val response = kotlinx.coroutines.CompletableDeferred<ReaderEvent.ChatContext>()
+            check(webView != null)
+            contextRequests[id] = response
+            try {
+                command(buildJsonObject {
+                    put("type", "chatContext"); put("requestId", id); put("scope", scope)
+                    if (scope == "selection" && selectionCfi != null) put("cfi", selectionCfi)
+                }.toString())
+                val result = kotlinx.coroutines.withTimeout(30_000) { response.await() }
+                result.context ?: throw ChatContextFailure(result.problem == "too_long")
+            } finally { contextRequests.remove(id) }
+        }
+
+    class ChatContextFailure(val tooLong: Boolean) : java.io.IOException("Reader context unavailable")
     @Volatile
     private var webView: WebView? = null
     @Volatile private var streamSession: EpubStreamSession? = null
@@ -73,6 +92,8 @@ class ReaderController {
     @Synchronized fun detach(view: WebView) {
         if (webView === view) {
             webView = null
+            contextRequests.values.forEach { it.cancel() }
+            contextRequests.clear()
             streamSession?.close()
             streamSession = null
         }
@@ -89,7 +110,10 @@ class ReaderController {
         if (webView !== view) return
         val event = ReaderBridge.parseEvent(data) ?: return
         Handler(Looper.getMainLooper()).post {
-            if (webView === view) listener?.invoke(event)
+            if (webView === view) {
+                if (event is ReaderEvent.ChatContext) contextRequests[event.requestId]?.complete(event)
+                else listener?.invoke(event)
+            }
         }
     }
 

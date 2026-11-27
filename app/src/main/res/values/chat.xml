@@ -1,0 +1,37 @@
+<resources>
+    <string name="chat_title">Discuss this book · AI</string>
+    <string name="chat_direct_required">Choose a direct provider, model and credentials in Settings → AI connection. This chat does not use BookOrbit server AI.</string>
+    <string name="chat_scope_chapter">Chapter so far</string>
+    <string name="chat_scope_book">Book so far</string>
+    <string name="chat_scope_selection">Selected text</string>
+    <string name="chat_boundary_notice">Book/chapter context stops at the START of the displayed page. Selected text includes only your selection. Context stays fixed for this conversation; start a new chat to update it. The model may still know the story: spoiler prevention is not guaranteed.</string>
+    <string name="chat_context_size">%3$s · %1$d characters · %2$s</string>
+    <string name="chat_preview">Review context</string>
+    <string name="chat_new">New chat</string>
+    <string name="chat_reset_notice">Delete this local conversation and choose a new reading boundary? Saved notes will remain.</string>
+    <string name="chat_assistant">AI</string>
+    <string name="chat_you">You</string>
+    <string name="chat_question">Ask about what you have read</string>
+    <string name="chat_consent">Send the context (%3$d characters), conversation history (%4$d messages) and your question to %1$s using %2$s? Provider charges and data policies apply. Context is not silently shortened; your model must support this request.</string>
+    <string name="chat_too_long">Too much context or history. Choose a chapter or selection, or start a new chat. No text was silently shortened or sent.</string>
+    <string name="chat_boundary_error">Cannot resolve an exact text/chapter boundary, or there is no text before this page. Try selected text. Nothing was sent.</string>
+    <string name="chat_request_error">The provider request did not complete, or the configuration changed. No automatic retry was made. Check your provider, model, context limits and connection.</string>
+    <string name="chat_storage_error">Cannot read or save this conversation. No automatic replacement was made.</string>
+    <string name="chat_interrupted">No complete answer was saved. A submitted request may still be billed. Retry only if you want to submit it again.</string>
+    <string name="chat_retry">Send again…</string>
+    <string name="chat_discard">Discard unanswered question</string>
+    <string name="chat_save_note">Save answer to Notes</string>
+    <string name="chat_note_queued">Saved locally; note sync is queued.</string>
+    <string name="chat_note_uncertain">Save was requested. Check Notes; this action will not be repeated automatically.</string>
+    <string name="chat_note_error">Could not confirm saving the note. Check Notes before trying another save.</string>
+    <string name="chat_close">Close</string>
+    <string name="chat_unavailable">Chat needs an identified text edition. Reopen the book or download it first.</string>
+    <string name="ai_extra_direct">Also enable a direct provider for reader chat and extra features</string>
+    <string name="ai_fallback_direct">Use that provider for short Reading Help when the server is unavailable</string>
+    <string name="ai_chat_features">Server: short Reading Help, photo search and Story Guide. Direct provider: persistent in-reader chat, book/chapter context before the reading boundary, Markdown and saving answers to Notes. Stock BookOrbit has no chat endpoint.</string>
+    <string name="ai_direct_features">The direct provider receives only confirmed reader context, questions and chat history. Photo search and Story Guide still use the server; they do not fall back.</string>
+    <string name="ai_fallback_notice">Fallback is chosen only after a failed content-free server availability check, before sending text. The recipient is shown for confirmation. A failed submitted model request is never automatically replayed elsewhere.</string>
+    <string name="ai_fallback_active">The server availability check failed. This request uses your configured direct provider instead.</string>
+    <string name="chat_quick_help">Short Reading Help (server/provider)</string>
+    <string name="chat_note_anchor_unavailable">This context has no note anchor accepted by the server. Saving to Notes is unavailable.</string>
+</resources>

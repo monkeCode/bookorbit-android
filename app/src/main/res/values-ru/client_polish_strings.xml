@@ -4,7 +4,7 @@
     <string name="ai_enter_token">Введите API-токен этого провайдера.</string>
     <string name="ai_invalid_token">Некорректный токен: нужны печатные ASCII-символы без пробелов и переносов, не более 8192 знаков.</string>
     <string name="guide_entry_description">Персонажи, события и связи · Открыть Story Guide</string>
-    <string name="ai_route_heading">Куда отправлять выделенный текст</string>
+    <string name="ai_route_heading">Основной маршрут краткой помощи</string>
     <string name="ai_provider">Провайдер</string>
     <string name="ai_server_summary">Использовать BookOrbit и настройки ИИ на сервере.</string>
     <string name="ai_direct_summary">Подключить своего провайдера или локальный сервер моделей.</string>

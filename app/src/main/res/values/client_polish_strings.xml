@@ -4,7 +4,7 @@
     <string name="ai_enter_token">Enter an API token for this provider.</string>
     <string name="ai_invalid_token">Invalid token: use printable ASCII without spaces or line breaks, at most 8192 characters.</string>
     <string name="guide_entry_description">Characters, events and connections · Open Story Guide</string>
-    <string name="ai_route_heading">Where to send selected text</string>
+    <string name="ai_route_heading">Primary route for short Reading Help</string>
     <string name="ai_provider">Provider</string>
     <string name="ai_server_summary">Use your BookOrbit server and its AI configuration.</string>
     <string name="ai_direct_summary">Use your own provider or a local model server.</string>

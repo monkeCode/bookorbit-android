@@ -124,3 +124,19 @@ This test uses isolated preferences/directories, local MockWebServer responses a
 test-owned export files. It checks privacy, opt-in persistence, unchanged HTTP
 bodies, disable/clear behavior and storage-failure isolation. It does not enable
 logging for the retained account or send diagnostics to any external service.
+
+## Reader chat checks
+
+```sh
+bash tools/android/gradle.sh :app:assembleFdroidDebug :app:assembleFdroidDebugAndroidTest
+python tools/android/run-instrumentation.py --class com.bookorbit.feature.readinghelp.ReaderChatContextTest --repeat 3 --install
+python tools/android/run-instrumentation.py --class com.bookorbit.feature.readinghelp.ReaderChatUiTest --repeat 3
+python tools/android/run-instrumentation.py --class com.bookorbit.feature.ai.CustomAiConnectionUiTest --repeat 3
+```
+
+Use the named isolated emulator, not a phone or retained real-server account.
+The context test uses real WebView DOM/Foliate CFIs with synthetic text; the UI test
+uses loopback provider responses, test-owned encrypted preferences and an in-memory
+annotation queue with a no-op scheduler. It checks history, consent, Markdown,
+secondary-provider routing and note enqueueing, not real paid inference or server
+note delivery. See [reader chat](../docs/READER_CHAT.md) for current boundaries.

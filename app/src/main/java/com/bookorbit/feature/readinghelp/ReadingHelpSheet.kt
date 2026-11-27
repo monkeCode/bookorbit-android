@@ -51,7 +51,7 @@ fun ReadingHelpSheet(fileId: Int, passage: String, repository: ReadingHelpReposi
             try {
                 val language = answerLanguage.takeIf { it.matches(Regex("[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*")) } ?: "en"
                 repository.answer(ReadingHelpRequest(kind, fileId, language, listOf(passage),
-                    term = term.takeIf { kind == "term" }, scope = "chapter".takeIf { kind == "term" }, careful = careful), expectedRevision = access?.revision, expectedOwner = access?.owner).collect { event ->
+                    term = term.takeIf { kind == "term" }, scope = "chapter".takeIf { kind == "term" }, careful = careful), expectedRevision = access?.revision, expectedOwner = access?.owner, expectedRoute = access?.connection?.route).collect { event ->
                     when (event.type) {
                         "delta" -> answer += event.text
                         "done" -> { answer = event.text; completed = true }
@@ -71,6 +71,7 @@ fun ReadingHelpSheet(fileId: Int, passage: String, repository: ReadingHelpReposi
                 available.connection?.route == com.bookorbit.feature.ai.AiRoute.DIRECT -> stringResource(R.string.ai_active_direct, available.connection.provider.displayName, available.connection.helpModel) + "\n" + com.bookorbit.feature.ai.aiEndpointLabel(available.connection)
                 else -> stringResource(R.string.ai_active_server)
             }, style = MaterialTheme.typography.bodySmall) }
+            if (access?.fallbackReason != null) Text(stringResource(R.string.ai_fallback_active), style = MaterialTheme.typography.bodySmall)
             Text(stringResource(R.string.help_context), style = MaterialTheme.typography.bodyMedium)
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                 SelectionContainer { Text(passage, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }

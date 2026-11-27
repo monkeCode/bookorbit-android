@@ -34,6 +34,7 @@ data class ViewportRect(val left: Double, val top: Double, val right: Double, va
 data class SearchHit(val cfi: String, val pre: String, val match: String, val post: String)
 
 sealed interface ReaderEvent {
+    data class ChatContext(val requestId: String, val context: com.bookorbit.feature.readinghelp.ReaderChatContext?, val problem: String?) : ReaderEvent
     data object Ready : ReaderEvent
     data class Loaded(val toc: List<TocItem>, val title: String?, val rightToLeft: Boolean = false) : ReaderEvent
     data class Relocate(
@@ -93,6 +94,11 @@ object ReaderBridge {
     fun parseEvent(data: String): ReaderEvent? = runCatching {
         val obj = json.parseToJsonElement(data).jsonObject
         when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+            "chatContext" -> ReaderEvent.ChatContext(
+                obj.getValue("requestId").jsonPrimitive.content,
+                obj["context"]?.let { json.decodeFromJsonElement(com.bookorbit.feature.readinghelp.ReaderChatContext.serializer(), it).also { context -> context.validate() } },
+                obj["problem"]?.jsonPrimitive?.contentOrNull,
+            )
             "ready" -> ReaderEvent.Ready
             "readAlong" -> ReaderEvent.ReadAlong(
                 available = obj["available"]?.jsonPrimitive?.booleanOrNull ?: false,

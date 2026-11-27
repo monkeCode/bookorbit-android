@@ -1,6 +1,6 @@
 # Independent Android client plan
 
-**Updated: November 26, 2026 · active development branch: `feat/independent-android-client`**
+**Updated: November 27, 2026 · active development branch: `feat/reader-ai-chat`**
 
 This is the maintained English plan for the AGPL fork of
 [deranjer/bookorbit-android](https://github.com/deranjer/bookorbit-android).
@@ -66,6 +66,12 @@ Local immutable APK archives and `build-info.json` live under ignored `.local/ap
 They are not public downloads. A source push is not authorization to create a release,
 publish an APK or deploy a server change.
 
+The `feat/reader-ai-chat` branch adds the [direct reader chat](READER_CHAT.md) without
+publishing a new release: both flavors passed lint/assembly and 643 JVM tests each,
+plus 31 Node and 20 Python checks. Five synthetic emulator scenarios passed three
+runs each. Real provider/book/hardware acceptance remains pending; the 0.9.23
+checkpoint counts above describe the earlier release, not this branch.
+
 ## User feedback and acceptance ledger
 
 | Report / requirement | Implemented response | Remaining acceptance |
@@ -86,6 +92,8 @@ publish an APK or deploy a server change.
 | Story Guide is hard to find | A visible card below Read/Listen, before download controls | Real guide generation/access and clearer future integration |
 | Device registration fails despite HTTPS | Persistent stage/HTTP/bounded-code diagnostics; direct entry from AI settings | Exact physical-phone failure, server version and trust/hardware validation |
 | Add a debug switch and downloadable logs | Opt-in structured private logging, bounded retention, explicit Android document export; 0.9.23 tests passed | Physical-device and user acceptance |
+| Discuss a book inside the reader, continue a chat, render Markdown and save answers | Direct-provider chat with encrypted local history, exact page-start/selection boundaries, TOC chapter bounds and anchored note outbox | Real provider and book acceptance; streaming revision pinning, long-book retrieval and multiple-conversation browser remain absent; see [reader chat](READER_CHAT.md) |
+| Keep a third-party adapter alongside server AI, with fallback | Separate direct-enabled and preflight-fallback settings; chat works alongside a server primary route | Fallback is only for short Reading Help before text submission, never a replay of a submitted model request; photo/guide stay server-only |
 
 The user explicitly clarified that the headset problem concerns **streamed**, not
 downloaded, audio and that the broken AI search means **photo search**. Do not ask

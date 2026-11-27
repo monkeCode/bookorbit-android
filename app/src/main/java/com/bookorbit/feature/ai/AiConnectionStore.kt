@@ -30,6 +30,8 @@ data class AiConnection(
     val revision: Long = 0,
     val baseUrl: String = "",
     val allowInsecure: Boolean = false,
+    val directEnabled: Boolean = false,
+    val fallbackToDirect: Boolean = false,
 )
 
 /** Never a data class: accidental logs cannot stringify the secret. */
@@ -47,6 +49,8 @@ private data class ProtectedAiConnection(
     val tokens: Map<AiProvider, String> = emptyMap(),
     val endpoints: Map<AiProvider, String> = emptyMap(),
     val insecure: Map<AiProvider, Boolean> = emptyMap(),
+    val directEnabled: Boolean = false,
+    val fallbackToDirect: Boolean = false,
 )
 
 @Singleton
@@ -68,12 +72,14 @@ class AiConnectionStore @Inject constructor(private val storage: SecureStorage, 
         val insecure = value.insecure[selected] == true
         return AiConnection(value.route, selected, value.helpModels[selected].orEmpty(), value.guideModels[selected].orEmpty(), !value.tokens[selected].isNullOrBlank(), revision = readRevision,
             baseUrl = endpoint, allowInsecure = insecure,
-            valid = value.route == AiRoute.SERVER || runCatching { validatedAiBaseUrl(selected, endpoint, insecure) }.isSuccess)
+            valid = (!value.directEnabled && value.route == AiRoute.SERVER) || runCatching { validatedAiBaseUrl(selected, endpoint, insecure) }.isSuccess,
+            directEnabled = value.directEnabled || value.route == AiRoute.DIRECT, fallbackToDirect = value.fallbackToDirect)
     }
 
     /** Blank replacement keeps an existing token; removing it is a separate explicit operation. */
     fun save(owner: SessionOwner, route: AiRoute, provider: AiProvider, helpModel: String, guideModel: String,
-        replacementToken: String = "", baseUrl: String = defaultAiBaseUrl(provider), allowInsecure: Boolean = false) {
+        replacementToken: String = "", baseUrl: String = defaultAiBaseUrl(provider), allowInsecure: Boolean = false,
+        directEnabled: Boolean = route == AiRoute.DIRECT, fallbackToDirect: Boolean = false) {
         require(session.owns(owner))
         require(validAiModel(helpModel) && validAiModel(guideModel))
         if (provider == AiProvider.GOOGLE) require('/' !in helpModel && '/' !in guideModel)
@@ -87,7 +93,8 @@ class AiConnectionStore @Inject constructor(private val storage: SecureStorage, 
             if (replacementToken.isNotEmpty()) tokens[provider] = replacementToken
             val value = old.copy(route = route, provider = provider, helpModels = old.helpModels + (provider to helpModel),
                 guideModels = old.guideModels + (provider to guideModel), tokens = tokens,
-                endpoints = old.endpoints + (provider to endpoint), insecure = old.insecure + (provider to allowInsecure))
+                endpoints = old.endpoints + (provider to endpoint), insecure = old.insecure + (provider to allowInsecure),
+                directEnabled = directEnabled || route == AiRoute.DIRECT, fallbackToDirect = fallbackToDirect && directEnabled)
             storage.putString(key(owner), json.encodeToString(ProtectedAiConnection.serializer(), value))
             version.incrementAndGet()
         }
@@ -99,7 +106,7 @@ class AiConnectionStore @Inject constructor(private val storage: SecureStorage, 
         require(session.owns(owner))
         val (value, revision) = synchronized(lock) { read(owner) to version.get() }
         require(session.owns(owner))
-        require(value.route == AiRoute.DIRECT)
+        require(value.directEnabled || value.route == AiRoute.DIRECT)
         val model = value.helpModels[value.provider].orEmpty()
         val token = value.tokens[value.provider].orEmpty()
         val endpoint = validatedAiBaseUrl(value.provider, value.endpoints[value.provider] ?: defaultAiBaseUrl(value.provider), value.insecure[value.provider] == true)
@@ -118,11 +125,13 @@ class AiConnectionStore @Inject constructor(private val storage: SecureStorage, 
         mutableRevision.update { maxOf(it, committed) }
     }
 
-    fun useServer(owner: SessionOwner) {
+    fun useServer(owner: SessionOwner, directEnabled: Boolean? = null, fallbackToDirect: Boolean? = null) {
         require(session.owns(owner))
         val committed = synchronized(lock) {
             val value = runCatching { read(owner) }.getOrDefault(ProtectedAiConnection())
-            storage.putString(key(owner), json.encodeToString(ProtectedAiConnection.serializer(), value.copy(route = AiRoute.SERVER)))
+            val enabled = directEnabled ?: (value.directEnabled || value.route == AiRoute.DIRECT)
+            storage.putString(key(owner), json.encodeToString(ProtectedAiConnection.serializer(), value.copy(route = AiRoute.SERVER,
+                directEnabled = enabled, fallbackToDirect = enabled && (fallbackToDirect ?: value.fallbackToDirect))))
             version.incrementAndGet()
         }
         mutableRevision.update { maxOf(it, committed) }

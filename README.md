@@ -82,9 +82,13 @@ isolated fixture server is described in [tools/README.md](tools/README.md).
 
 ### AI entry points
 
-- **Settings → AI connection:** choose BookOrbit server or a direct provider;
-  saving does not make a billable model call.
-- **Reader selection → Reading Help:** explicitly confirm sending the selected text.
+- **Settings → AI connection:** choose a primary route and optionally configure a
+  direct provider alongside the server, with opt-in short-help fallback.
+  Saving makes no model call.
+- **App text reader → chat button:** discuss an identified local edition using
+  book/chapter context before the page start, or selected text. Conversations stay
+  on-device, render Markdown and can save answers to Notes. See [limits and privacy](docs/READER_CHAT.md).
+- **Reader selection → Reading Help:** chat or short help, with explicit sending consent.
 - **Search → Find by photo · AI:** choose a cover/shelf photo, review it and confirm.
   This currently uses BookOrbit's server configuration, not the direct-provider key.
 - **Book details → Story Guide · AI:** open the card below Read/Listen. Opening
@@ -92,11 +96,12 @@ isolated fixture server is described in [tools/README.md](tools/README.md).
 
 Server Reading Help, photo search and Story Guide need
 [server trust setup](#allow-this-client-on-your-own-server). Direct selected-text
-help uses your provider connection instead.
+help and chat use your provider connection instead.
 
 Direct credentials stay encrypted and scoped to the server/account/provider.
 Changing a custom endpoint drops its previous token. Custom HTTP endpoints require
-explicit opt-in. There is no automatic provider/route fallback or paid POST replay.
+explicit opt-in. Optional short-help fallback is chosen before text submission and
+shown for confirmation; submitted model requests are never automatically replayed.
 
 ## Allow this client on your own server
 

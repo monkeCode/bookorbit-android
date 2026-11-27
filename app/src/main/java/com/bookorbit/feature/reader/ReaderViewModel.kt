@@ -48,6 +48,7 @@ class ReaderViewModel @Inject constructor(
     val nativeNarration: NativeNarrationSession,
     private val nativeStreaming: NativeNarrationStreaming,
     private val localNarration: LocalNativeNarration,
+    val readerChat: com.bookorbit.feature.readinghelp.ReaderChatRepository,
 ) : ViewModel() {
 
     val bookId: Int = savedStateHandle.get<Int>("id") ?: 0
@@ -62,6 +63,7 @@ class ReaderViewModel @Inject constructor(
         val initial: InitialProgress,
         val readAlongPosition: ReadAlongPosition? = null,
         val stream: EpubStreamPlan? = null,
+        val contentRevision: String? = null,
     )
 
     /** Text the user has selected in the page, not yet saved as a highlight. */
@@ -115,6 +117,15 @@ class ReaderViewModel @Inject constructor(
     private var currentSection = 0
 
     fun nativeReadAlongOwner(): ReadAlongOwner? = readAlongOwner
+
+    fun chatIdentity(): com.bookorbit.feature.readinghelp.ReaderChatIdentity? {
+        val owner = activityOwner?.takeIf { session.owns(it) } ?: return null
+        val resolved = _ui.value.resolved ?: return null
+        val revision = resolved.contentRevision ?: return null
+        return com.bookorbit.feature.readinghelp.ReaderChatIdentity(owner, bookId, resolved.fileId, revision)
+    }
+
+    fun refreshChatNotes() = loadAnnotations()
 
     suspend fun listenFromSelection(selection: PendingSelection, rate: Double) {
         if (_ui.value.toolbar?.selection != selection) return
@@ -211,17 +222,17 @@ class ReaderViewModel @Inject constructor(
                 val resolved = offline ?: if (stream == null) source.resolve(book, selectedFileId) else null
                 val fingerprint = if (stream != null) target.contentVersion?.takeIf { it.isNotBlank() }?.let {
                     "stream-v1:$it:${target.fileHash.orEmpty()}:${target.sizeBytes}"
-                } else if (resolved?.format == "epub") {
+                } else if (resolved?.format in setOf("epub", "fb2", "mobi", "azw", "azw3")) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val digest = java.security.MessageDigest.getInstance("SHA-256")
-                        resolved.ref.openInputStream(context).use { input ->
+                        checkNotNull(resolved).ref.openInputStream(context).use { input ->
                             val buffer = ByteArray(64 * 1024)
                             while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) }
                         }
                         digest.digest().joinToString("") { "%02x".format(it) }
                     }
                 } else null
-                val checkpoint = if (fingerprint != null) {
+                val checkpoint = if (fingerprint != null && (stream != null || resolved?.format == "epub")) {
                     val server = checkpointServer
                     val user = checkpointUser
                     if (server != null && user != null) {
@@ -237,7 +248,9 @@ class ReaderViewModel @Inject constructor(
                 _ui.update {
                     it.copy(
                         loadingFile = false,
-                        resolved = ResolvedOpen(resolved?.ref, target.format.orEmpty().lowercase(), selectedFileId, initial, checkpoint, stream),
+                        // Streaming resource routes cannot pin immutable bytes. Chat requires a
+                        // locally hashed copy rather than pretending metadata pins later fetches.
+                        resolved = ResolvedOpen(resolved?.ref, target.format.orEmpty().lowercase(), selectedFileId, initial, checkpoint, stream, fingerprint.takeIf { stream == null }),
                     )
                 }
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }

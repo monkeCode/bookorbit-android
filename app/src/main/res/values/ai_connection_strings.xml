@@ -7,7 +7,7 @@
     <string name="ai_ollama_notice">Ollama base address, without /api/chat. 127.0.0.1 means this phone, not your computer. For a LAN server, enter its reachable address. The model must already be installed on that server; this app does not download models.</string>
     <string name="ai_compatible_notice">Base address including the API prefix, for example https://host/v1/. The app appends chat/completions. Only non-streaming text Chat Completions is supported; images, tools and Story Guide are not implied.</string>
     <string name="ai_connection_title">AI connection</string>
-    <string name="ai_connection_notice">Choose the route explicitly. Direct mode sends the selected passage to the chosen endpoint, which may be local, on your network or in the cloud. It does not install a model on the phone. No automatic route switching. Saving makes no network or billable request.</string>
+    <string name="ai_connection_notice">Choose the primary route and optional direct adapter explicitly. Direct requests send confirmed context to the chosen local, network or cloud endpoint. No model is installed on the phone. Optional fallback applies only to short Reading Help before any text is submitted, never to failed model requests. Saving settings makes no network or billable request.</string>
     <string name="ai_route_server">Through BookOrbit</string>
     <string name="ai_route_direct">Direct from phone</string>
     <string name="ai_token_stored">Token stored: %1$s</string>

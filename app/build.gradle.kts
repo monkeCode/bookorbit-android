@@ -176,6 +176,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("org.tukaani:xz:1.10")
+    implementation("org.commonmark:commonmark:0.24.0")
 
     // Media + images
     implementation(libs.androidx.media3.exoplayer)

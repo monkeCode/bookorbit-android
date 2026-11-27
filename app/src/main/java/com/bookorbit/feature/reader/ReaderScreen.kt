@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -67,7 +68,10 @@ fun ReaderScreen(
     var highlightsVisible by remember { mutableStateOf(false) }
     var searchVisible by remember { mutableStateOf(false) }
     var noteDialog by remember { mutableStateOf<String?>(null) }
-    var helpPassage by remember { mutableStateOf<String?>(null) }
+    var chatVisible by remember { mutableStateOf(false) }
+    var chatSelectionCfi by remember { mutableStateOf<String?>(null) }
+    var chatSelectionText by remember { mutableStateOf<String?>(null) }
+    var quickHelpVisible by remember { mutableStateOf(false) }
     var readingTool by remember { mutableStateOf<Pair<ReadingTool, String>?>(null) }
     var readAlong by remember { mutableStateOf(ReaderEvent.ReadAlong(false, "unavailable")) }
     val nativeState by vm.nativeNarration.state.collectAsStateWithLifecycle()
@@ -87,6 +91,24 @@ fun ReaderScreen(
     }
 
     val context = LocalContext.current
+
+    fun openChat(cfi: String? = null, text: String? = null) {
+        if (vm.chatIdentity() == null || !ui.loaded || rendererFailed) {
+            if (cfi != null && !text.isNullOrBlank() && ui.loaded && !rendererFailed) {
+                chatSelectionText = text; quickHelpVisible = true; vm.dismissToolbar()
+                controller.readAlong("pause"); scope.launch { vm.nativeReadAlong("pause", null) }
+                return
+            }
+            Toast.makeText(context, R.string.chat_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        controller.readAlong("pause")
+        scope.launch { vm.nativeReadAlong("pause", null) }
+        chatSelectionCfi = cfi
+        chatSelectionText = text
+        chatVisible = true
+        vm.dismissToolbar()
+    }
 
     // Taps arrive from the page (so text selection keeps working): edges turn the page, the middle
     // toggles the chrome, and any tap while the highlight toolbar is open just dismisses it.
@@ -110,6 +132,7 @@ fun ReaderScreen(
     LaunchedEffect(Unit) {
         controller.listener = { event ->
             when (event) {
+                is ReaderEvent.ChatContext -> Unit // Consumed by ReaderController's request correlation.
                 is ReaderEvent.Ready -> ready = true
                 is ReaderEvent.Loaded -> vm.onLoaded(event.toc, event.title, event.rightToLeft)
                 is ReaderEvent.Relocate -> vm.onRelocate(event.cfi, event.fraction, event.chapterTitle, event.sectionIndex)
@@ -197,6 +220,9 @@ fun ReaderScreen(
                 IconButton(onClick = { searchVisible = true }) {
                     Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search_in_book), tint = Color.White)
                 }
+                IconButton(onClick = { openChat() }, enabled = ui.loaded && !rendererFailed) {
+                    Icon(Icons.Filled.ChatBubbleOutline, contentDescription = stringResource(R.string.chat_title), tint = Color.White)
+                }
                 IconButton(onClick = {
                     vm.loadBookmarks()
                     highlightsVisible = true
@@ -241,8 +267,8 @@ fun ReaderScreen(
                 onNote = { noteDialog = annotation?.note.orEmpty() },
                 onDelete = annotation?.let { a -> { vm.deleteAnnotation(a.id) } },
                 modifier = Modifier.fillMaxWidth(),
-                onReadingHelp = (target.selection?.text ?: annotation?.text)?.takeIf { it.isNotBlank() }?.let { text ->
-                    { controller.readAlong("pause"); scope.launch { vm.nativeReadAlong("pause", null) }; helpPassage = text; vm.dismissToolbar() }
+                onReadingHelp = (target.selection?.cfi ?: annotation?.cfi)?.let { cfi ->
+                    { openChat(cfi, target.selection?.text ?: annotation?.text) }
                 },
                 onTranslate = (target.selection?.text ?: annotation?.text)?.takeIf { it.isNotBlank() }?.let { text ->
                     { readingTool = ReadingTool.TRANSLATE to text }
@@ -320,10 +346,17 @@ fun ReaderScreen(
             onDismiss = { tocVisible = false },
         )
     }
-    helpPassage?.let { passage ->
-        ui.resolved?.fileId?.let { fileId ->
-            com.bookorbit.feature.readinghelp.ReadingHelpSheet(fileId, passage, vm.readingHelp, onDismiss = { helpPassage = null })
+    if (chatVisible && !quickHelpVisible) {
+        vm.chatIdentity()?.let { identity ->
+            com.bookorbit.feature.readinghelp.ReaderChatSheet(identity, chatSelectionCfi, vm.readerChat, controller,
+                onNotesChanged = vm::refreshChatNotes,
+                onQuickHelp = chatSelectionText?.let { { quickHelpVisible = true } }, onDismiss = { chatVisible = false })
         }
+    }
+    if (quickHelpVisible) {
+        ui.resolved?.fileId?.let { fileId -> chatSelectionText?.let { text ->
+            com.bookorbit.feature.readinghelp.ReadingHelpSheet(fileId, text, vm.readingHelp, onDismiss = { quickHelpVisible = false })
+        } }
     }
     readingTool?.let { (tool, text) -> ReadingToolsSheet(text, tool, vm.readingTools, onDismiss = { readingTool = null }, dictionaries = vm.dictionaries) }
     noteDialog?.let { initial ->

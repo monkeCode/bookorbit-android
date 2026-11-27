@@ -83,6 +83,12 @@ class SecureStorage internal constructor(
         if (key == KEY_DATA_OWNER) saveOwner(null) else prefs.edit().remove(key).apply()
     }
 
+    /** Call off the UI thread when a durable intent must precede an external side effect. */
+    fun putStringDurably(key: String, value: String?) {
+        require(key != KEY_DATA_OWNER)
+        check(prefs.edit().putString(key, value).commit()) { "Cannot persist protected data" }
+    }
+
     companion object {
         internal const val UNKNOWN_DATA_OWNER = "unknown-restored-owner"
         const val KEY_ACCESS_TOKEN = "access_token"

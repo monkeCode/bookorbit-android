@@ -17,6 +17,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import com.bookorbit.R
 import com.bookorbit.core.auth.SessionOwner
 
@@ -30,6 +31,8 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
     var guideModel by remember(owner) { mutableStateOf(initial.guideModel) }
     var baseUrl by remember(owner) { mutableStateOf(initial.baseUrl) }
     var insecure by remember(owner) { mutableStateOf(initial.allowInsecure) }
+    var extraDirect by remember(owner) { mutableStateOf(initial.directEnabled) }
+    var fallback by remember(owner) { mutableStateOf(initial.fallbackToDirect) }
     // Never save credentials in a Bundle, SavedStateHandle or ordinary preferences.
     var replacement by remember(owner, provider) { mutableStateOf("") }
     var failed by remember(owner) { mutableStateOf(false) }
@@ -39,8 +42,9 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
     val endpointValid = runCatching { validatedAiBaseUrl(provider, baseUrl, insecure) }.isSuccess
     val sameEndpoint = runCatching { validatedAiBaseUrl(provider, baseUrl, insecure).toString() == initial.baseUrl }.getOrDefault(false)
     val hasToken = initial.hasToken && sameEndpoint
+    val configureDirect = route == AiRoute.DIRECT || extraDirect
     val valid = owner != null &&
-        (route == AiRoute.SERVER || tokenValid && validAiModel(helpModel) && validAiModel(guideModel) && endpointValid && helpModel.isNotBlank() && (provider != AiProvider.GOOGLE || '/' !in helpModel) &&
+        (!configureDirect || tokenValid && validAiModel(helpModel) && validAiModel(guideModel) && endpointValid && helpModel.isNotBlank() && (provider != AiProvider.GOOGLE || '/' !in helpModel) &&
             (!provider.requiresToken || hasToken || replacement.isNotBlank()))
     Dialog(onDismissRequest = { replacement = ""; onDismiss() },
         properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn, usePlatformDefaultWidth = false,
@@ -54,8 +58,9 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
                         OutlinedButton(onClick = { replacement = ""; onDismiss() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cancel)) }
                         Button(enabled = valid, modifier = Modifier.weight(1f), onClick = {
                             failed = runCatching {
-                                if (route == AiRoute.SERVER) store.useServer(requireNotNull(owner))
-                                else store.save(requireNotNull(owner), route, provider, helpModel, guideModel, replacement, baseUrl, insecure)
+                                 if (!configureDirect) store.useServer(requireNotNull(owner), directEnabled = false, fallbackToDirect = false)
+                                 else store.save(requireNotNull(owner), route, provider, helpModel, guideModel, replacement, baseUrl, insecure,
+                                     directEnabled = true, fallbackToDirect = fallback)
                                 replacement = ""; onDismiss()
                             }.isFailure
                         }) { Text(stringResource(R.string.ai_save)) }
@@ -73,8 +78,17 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
                     if (onDeviceVerification != null) OutlinedButton(onClick = { replacement = ""; onDeviceVerification() }) {
                         Text(stringResource(R.string.attest_title))
                     }
+                    Row {
+                        Checkbox(extraDirect, { extraDirect = it }, modifier = Modifier.testTag("ai-extra-direct"))
+                        Text(stringResource(R.string.ai_extra_direct), Modifier.weight(1f))
+                    }
+                    if (extraDirect) Row {
+                        Checkbox(fallback, { fallback = it }, modifier = Modifier.testTag("ai-fallback-direct"))
+                        Text(stringResource(R.string.ai_fallback_direct), Modifier.weight(1f))
+                    }
                 }
-                if (route == AiRoute.DIRECT) {
+                Text(stringResource(R.string.ai_chat_features), style = MaterialTheme.typography.bodySmall)
+                if (configureDirect) {
                     Text(stringResource(R.string.ai_provider), style = MaterialTheme.typography.titleMedium)
                     Box {
                       OutlinedButton(onClick = { choosingProvider = true }, modifier = Modifier.fillMaxWidth()) { Text(provider.displayName) }
@@ -95,7 +109,7 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
                             modifier = Modifier.fillMaxWidth(), isError = baseUrl.isNotBlank() && !endpointValid,
                             label = { Text(stringResource(R.string.ai_base_url)) })
                         Row {
-                            Checkbox(insecure, { insecure = it })
+                            Checkbox(insecure, { insecure = it }, modifier = Modifier.testTag("ai-http"))
                             Text(stringResource(R.string.ai_allow_http), Modifier.weight(1f))
                         }
                         if (!sameEndpoint && initial.hasToken) Text(stringResource(R.string.ai_endpoint_token_reset), color = MaterialTheme.colorScheme.error)
@@ -111,7 +125,8 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
                         failed = runCatching { store.removeToken(requireNotNull(owner), provider)
                             initial = store.connection(owner, provider); replacement = "" }.isFailure
                     }) { Text(stringResource(R.string.ai_token_remove)) }
-                    Text(stringResource(R.string.ai_direct_scope), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.ai_direct_features), style = MaterialTheme.typography.bodySmall)
+                    if (route == AiRoute.SERVER && fallback) Text(stringResource(R.string.ai_fallback_notice), style = MaterialTheme.typography.bodySmall)
                     if (!endpointValid) Text(stringResource(R.string.ai_enter_endpoint), style = MaterialTheme.typography.bodySmall)
                     if (helpModel.isBlank()) Text(stringResource(R.string.ai_enter_model), style = MaterialTheme.typography.bodySmall)
                     if (provider.requiresToken && !hasToken && replacement.isBlank()) Text(stringResource(R.string.ai_enter_token), style = MaterialTheme.typography.bodySmall)
@@ -120,7 +135,7 @@ fun AiConnectionDialog(store: AiConnectionStore, owner: SessionOwner?, onDeviceV
                 TextButton(onClick = { details = !details }) { Text(stringResource(R.string.ai_connection_details)) }
                 if (details) {
                     Text(stringResource(R.string.ai_connection_notice), style = MaterialTheme.typography.bodySmall)
-                    if (route == AiRoute.DIRECT) {
+                    if (configureDirect) {
                         if (provider.customEndpoint) Text(stringResource(if (provider == AiProvider.OLLAMA) R.string.ai_ollama_notice else R.string.ai_compatible_notice), style = MaterialTheme.typography.bodySmall)
                         Text(stringResource(R.string.ai_model_notice), style = MaterialTheme.typography.bodySmall)
                         Text(stringResource(R.string.ai_guide_direct_unsupported), style = MaterialTheme.typography.bodySmall)

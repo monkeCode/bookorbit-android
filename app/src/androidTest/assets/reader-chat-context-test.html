@@ -1,0 +1,62 @@
+<!doctype html><meta charset="utf-8">
+<script>TestResult.stage('classic script');</script>
+<script type="module">
+try {
+  TestResult.stage('module script');
+  const { extractChatContext } = await import('./chat-context.js');
+  TestResult.stage('context imported');
+  const { View } = await import('./foliate/view.js');
+  TestResult.stage('view imported');
+  const parse = text => new DOMParser().parseFromString(`<html><head></head><body>${text}</body></html>`, 'text/html');
+  const first = '<p>FIRST READ.</p>';
+  const second = '<p id="older">OTHER CHAPTER.</p><p id="b">READ NOW. UNREAD PAGE.</p>';
+  let futureLoads = 0;
+  const view = new View();
+  view.book = {
+    sections: [{ createDocument: async () => parse(first) }, { createDocument: async () => parse(second) },
+      { createDocument: async () => { futureLoads++; throw Error('future loaded'); } }],
+    resolveHref: href => href === 'two#b' ? { index: 1, anchor: doc => doc.getElementById('b') }
+      : href === 'two' ? { index: 1, anchor: () => 0 } : null,
+  };
+  const doc = parse(second);
+  const node = doc.getElementById('b').firstChild;
+  const range = doc.createRange(); range.setStart(node, 9); range.setEnd(node, node.length);
+  view.lastLocation = { cfi: view.getCFI(1, range), tocItem: { label: 'Chapter B', href: 'two#b' } };
+  let count = 0;
+  function check(value) { if (!value) throw Error(`check ${count + 1}`); count++; }
+  async function fails(fn, reason = 'boundary') {
+    try { await fn(); throw Error('unexpected success'); } catch (error) { check(error.message === reason); }
+  }
+  const book = await extractChatContext(view, { scope: 'book' });
+  check(book.text.includes('FIRST READ.') && book.text.includes('OTHER CHAPTER.') && book.text.includes('READ NOW.') && !book.text.includes('UNREAD'));
+  const chapter = await extractChatContext(view, { scope: 'chapter' });
+  check(chapter.text.trim() === 'READ NOW.' && chapter.chapter === 'Chapter B');
+  check(view.resolveCFI(chapter.noteCfi).anchor(parse(second)).toString() === chapter.noteText);
+  view.lastLocation.tocItem.href = 'two';
+  const sectionStart = await extractChatContext(view, { scope: 'chapter' });
+  check(sectionStart.text.includes('OTHER CHAPTER.') && !sectionStart.text.includes('FIRST READ.') && !sectionStart.text.includes('UNREAD'));
+  view.lastLocation.tocItem.href = 'missing';
+  await fails(() => extractChatContext(view, { scope: 'chapter' }));
+  range.setStart(node, 0); range.setEnd(node, 4);
+  const selected = await extractChatContext(view, { scope: 'selection', cfi: view.getCFI(1, range) });
+  check(selected.text.trim() === 'READ' && selected.noteText === 'READ');
+  check(futureLoads === 0);
+  const realResolver = view.resolveCFI.bind(view);
+  view.resolveCFI = cfi => {
+    const resolved = realResolver(cfi);
+    return { index: resolved.index, anchor: doc => { const value = resolved.anchor(doc); value.setStart(value.startContainer, 10); return value; } };
+  };
+  await fails(() => extractChatContext(view, { scope: 'book' }));
+  view.resolveCFI = realResolver;
+  const huge = 'x'.repeat(64001);
+  view.book.sections[1].createDocument = async () => parse(`<p>${huge}</p>`);
+  const hugeDoc = await view.book.sections[1].createDocument();
+  const hugeRange = hugeDoc.createRange(); hugeRange.setStart(hugeDoc.body.firstChild.firstChild, huge.length); hugeRange.collapse(true);
+  view.lastLocation.cfi = view.getCFI(1, hugeRange);
+  await fails(() => extractChatContext(view, { scope: 'book' }), 'too_long');
+  const emptyRange = hugeDoc.createRange(); emptyRange.setStart(hugeDoc.body.firstChild.firstChild, 0); emptyRange.collapse(true);
+  view.lastLocation = { cfi: view.getCFI(1, emptyRange), tocItem: { href: 'two' } };
+  await fails(() => extractChatContext(view, { scope: 'chapter' }));
+  TestResult.complete(`ok:${count}`);
+} catch (error) { TestResult.complete(String(error.stack ?? error)); }
+</script>

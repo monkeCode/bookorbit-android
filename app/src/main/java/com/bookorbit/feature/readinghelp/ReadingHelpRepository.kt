@@ -31,7 +31,8 @@ class ReadingHelpRepository @Inject constructor(@com.bookorbit.core.network.Mobi
     private val connections: AiConnectionStore? = null, private val direct: DirectReadingHelp? = null, private val session: SessionManager? = null) {
     enum class Problem { RESTRICTED, FORBIDDEN, DISABLED, UNSUPPORTED, AUTH, BUDGET, READER_CAP, CAREFUL_OFF, TIMEOUT, REFUSED, TOO_LONG, NETWORK, PROVIDER, CONFIGURATION }
     data class Access(val enabled: Boolean = false, val careful: Boolean = false, val problem: Problem? = null,
-        val connection: AiConnection? = null, val revision: Long? = null, val owner: SessionOwner? = null)
+        val connection: AiConnection? = null, val revision: Long? = null, val owner: SessionOwner? = null,
+        val fallbackReason: Problem? = null)
     class Failure(val problem: Problem) : IOException(problem.name)
 
     /** No valid passage is sent: the DTO must fail validation before a provider can be called. */
@@ -45,7 +46,14 @@ class ReadingHelpRepository @Inject constructor(@com.bookorbit.core.network.Mobi
             enabled = (!connection.provider.requiresToken || connection.hasToken) && connection.helpModel.isNotBlank(), careful = true,
             problem = Problem.CONFIGURATION.takeIf { connection.provider.requiresToken && !connection.hasToken || connection.helpModel.isBlank() },
             connection = connection, revision = revision, owner = owner)
-        return serverAccess().copy(connection = connection, revision = revision, owner = owner)
+        val server = serverAccess()
+        if (!server.enabled && connection?.directEnabled == true && connection.fallbackToDirect &&
+            server.problem in setOf(Problem.RESTRICTED, Problem.FORBIDDEN, Problem.DISABLED, Problem.UNSUPPORTED, Problem.NETWORK, Problem.TIMEOUT)) {
+            val ready = connection.helpModel.isNotBlank() && (!connection.provider.requiresToken || connection.hasToken)
+            return Access(enabled = ready, careful = true, problem = Problem.CONFIGURATION.takeUnless { ready },
+                connection = connection.copy(route = AiRoute.DIRECT), revision = revision, owner = owner, fallbackReason = server.problem)
+        }
+        return server.copy(connection = connection, revision = revision, owner = owner)
     }
 
     private suspend fun serverAccess(): Access = try {
@@ -71,11 +79,13 @@ class ReadingHelpRepository @Inject constructor(@com.bookorbit.core.network.Mobi
     catch (e: Exception) { Access(problem = Problem.NETWORK) }
 
     /** Each collection is one explicitly confirmed request. Cancel collection to cancel the HTTP call. */
-    fun answer(request: ReadingHelpRequest, expectedRevision: Long? = null, expectedOwner: SessionOwner? = null): Flow<ReadingHelpEvent> = flow {
+    fun answer(request: ReadingHelpRequest, expectedRevision: Long? = null, expectedOwner: SessionOwner? = null,
+        expectedRoute: AiRoute? = null): Flow<ReadingHelpEvent> = flow {
         request.validate()
         if (expectedOwner != null && session?.owns(expectedOwner) != true) throw Failure(Problem.AUTH)
         if (expectedRevision != null && expectedRevision != connections?.revision) throw Failure(Problem.CONFIGURATION)
         val access = access()
+        if (expectedRoute != null && expectedRoute != access.connection?.route) throw Failure(Problem.CONFIGURATION)
         if (!access.enabled) throw Failure(access.problem ?: Problem.PROVIDER)
         if (access.revision != connections?.revision) throw Failure(Problem.CONFIGURATION)
         if (request.careful && !access.careful) throw Failure(Problem.CAREFUL_OFF)

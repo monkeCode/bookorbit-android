@@ -14,7 +14,14 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 enum class SeriesViewMode { LIST, GRID }
 
-enum class ReaderInterface { APP, APP_STREAMING, SERVER_WEB }
+enum class ReaderInterface {
+    APP, SERVER_WEB;
+
+    companion object {
+        /** Both old native modes now mean streaming EPUB with explicit offline downloads. */
+        fun fromStored(value: String?): ReaderInterface = if (value == "SERVER_WEB") SERVER_WEB else APP
+    }
+}
 
 private val Context.appSettingsDataStore by preferencesDataStore("app_settings")
 
@@ -38,8 +45,7 @@ class AppSettingsStore @Inject constructor(
     private val readingFullscreenKey = booleanPreferencesKey("reading_fullscreen")
 
     val readerInterface = context.appSettingsDataStore.data.map { prefs ->
-        prefs[readerInterfaceKey]?.let { runCatching { ReaderInterface.valueOf(it) }.getOrNull() }
-            ?: ReaderInterface.APP
+        ReaderInterface.fromStored(prefs[readerInterfaceKey])
     }
 
     val readingFullscreen = context.appSettingsDataStore.data.map { it[readingFullscreenKey] ?: true }

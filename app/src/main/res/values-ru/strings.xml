@@ -471,10 +471,9 @@
     <string name="settings_reading">Чтение</string>
     <string name="settings_reader_interface">Интерфейс читалки</string>
     <string name="settings_reader_interface_desc">Выберите способ открытия книг.</string>
-    <string name="reader_interface_app">Приложение · файл (по умолчанию)</string>
-    <string name="reader_interface_streaming">Приложение · EPUB онлайн</string>
+    <string name="reader_interface_app">Встроенный</string>
     <string name="reader_streaming_progress">EPUB онлайн · %1$d%%</string>
-    <string name="reader_interface_web">Веб-читалка сервера</string>
+    <string name="reader_interface_web">BookOrbit</string>
     <string name="settings_reading_fullscreen">Полноэкранное чтение</string>
     <string name="settings_reading_fullscreen_desc">Книга на весь экран.</string>
     <string name="reader_web_unavailable">Не удалось открыть серверную читалку. Проверьте подключение или откройте книгу в приложении.</string>

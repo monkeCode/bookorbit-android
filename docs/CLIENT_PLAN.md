@@ -170,9 +170,10 @@ them to repeat these facts or substitute a different test scenario.
 - Audiobooks use Media3 HTTP Range streaming, not a hidden permanent full download.
   Auth is live, refresh is single-flight, origins/routes are bounded and ownership
   is checked on open/read. A refresh retains the same Range and source clock.
-- `APP_STREAMING` is opt-in. EPUB metadata/chapters/resources load through scoped
-  exact-file native transport; JWT is not exposed to WebView. Cached-file mode stays
-  the default and explicitly downloaded editions override either mode.
+- Reader settings offer **Built-in** and **BookOrbit**. The built-in reader streams
+  undownloaded EPUB metadata/chapters/resources through scoped exact-file native
+  transport; JWT is not exposed to WebView. Explicitly downloaded EPUBs open locally.
+  Both former native settings migrate to this same behavior.
 - Streaming failures do not silently download a whole archive. Other formats,
   including PDF, still need complete temporary files. Literal-percent resources
   account for the audited server's double-decoding behavior.

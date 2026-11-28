@@ -44,7 +44,6 @@ class ReaderViewModel @Inject constructor(
     private val session: com.bookorbit.core.auth.SessionManager,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val epubStreaming: EpubStreaming,
-    private val appSettings: com.bookorbit.core.settings.AppSettingsStore,
     val nativeNarration: NativeNarrationSession,
     private val nativeStreaming: NativeNarrationStreaming,
     private val localNarration: LocalNativeNarration,
@@ -64,6 +63,7 @@ class ReaderViewModel @Inject constructor(
         val readAlongPosition: ReadAlongPosition? = null,
         val stream: EpubStreamPlan? = null,
         val contentRevision: String? = null,
+        val sourceFile: com.bookorbit.core.model.BookFileRef? = null,
     )
 
     /** Text the user has selected in the page, not yet saved as a highlight. */
@@ -155,6 +155,9 @@ class ReaderViewModel @Inject constructor(
             val plan = if (resolved.ref != null) localNarration.open(resolved.ref, bookId, owner, account)
                 else nativeStreaming.open(bookId, selectedFileId, account)
             pending = plan
+            if (resolved.stream != null) require(plan.timeline.streamingFingerprint(checkNotNull(resolved.sourceFile)) == owner.fingerprint) {
+                "Narration metadata changed; reopen the edition"
+            }
             if (!nativeNarration.isCurrent(ticket)) return true
             if (fromSelection != null) require(plan.timeline.selectionStart(fromSelection) != null) { "Selected narration fragment changed" }
             val saved = if (fromSelection != null) fromSelection.copy(rate = rate?.takeIf { it.isFinite() && it in 0.5..2.0 } ?: 1.0)
@@ -232,13 +235,18 @@ class ReaderViewModel @Inject constructor(
                 val target = (com.bookorbit.core.model.BookFiles.readingTarget(book, selectedFileId)
                     as? com.bookorbit.core.model.BookFiles.ReadingTarget.Foliate)?.file
                     ?: error("The selected edition cannot be opened in this reader")
-                val mode = appSettings.readerInterface.first()
                 val offline = source.offlineFile(book.id, target)
-                val stream = if (offline == null && target.format?.lowercase() == "epub" && mode == com.bookorbit.core.settings.ReaderInterface.APP_STREAMING)
+                val stream = if (shouldStreamEpub(target.format, offline != null))
                     epubStreaming.open(book.id, target.id) else null
                 val resolved = offline ?: if (stream == null) source.resolve(book, selectedFileId) else null
-                val fingerprint = if (stream != null) target.contentVersion?.takeIf { it.isNotBlank() }?.let {
-                    "stream-v1:$it:${target.fileHash.orEmpty()}:${target.sizeBytes}"
+                val fingerprint = if (stream != null) {
+                    try {
+                        kotlinx.coroutines.withTimeoutOrNull(4000) {
+                            val plan = nativeStreaming.open(book.id, target.id, activityOwner)
+                            try { plan.timeline.streamingFingerprint(target) } finally { plan.close() }
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (_: Exception) { null } // A text-only EPUB is still readable.
                 } else if (resolved?.format in setOf("epub", "fb2", "mobi", "azw", "azw3")) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val digest = java.security.MessageDigest.getInstance("SHA-256")
@@ -268,7 +276,7 @@ class ReaderViewModel @Inject constructor(
                         loadingFile = false,
                         // Streaming resource routes cannot pin immutable bytes. Chat requires a
                         // locally hashed copy rather than pretending metadata pins later fetches.
-                        resolved = ResolvedOpen(resolved?.ref, target.format.orEmpty().lowercase(), selectedFileId, initial, checkpoint, stream, fingerprint.takeIf { stream == null }),
+                        resolved = ResolvedOpen(resolved?.ref, target.format.orEmpty().lowercase(), selectedFileId, initial, checkpoint, stream, fingerprint.takeIf { stream == null }, target),
                     )
                 }
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }

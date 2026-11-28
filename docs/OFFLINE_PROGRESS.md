@@ -53,8 +53,17 @@ EPUB audio accrues LISTEN sessions, not an additional READ session. Native follo
 highlighting does not move the saved text position. Server narration markers must
 resolve to an unambiguous fragment and source clock in this edition. Unresolvable
 markers block playback/reporting; explicit selection can establish a fresh start.
-Streaming discovery requires identifiable `contentVersion` metadata, but unchanged
-server IDs/metadata cannot guarantee immutable resource bytes.
+Streaming discovery accepts missing optional `contentVersion`: a validated SMIL
+playlist, exact book/file IDs and available file metadata form a deterministic
+snapshot identity. Changed fragments, source clocks and resources invalidate that
+snapshot. Existing versioned identities are retained. Unchanged server IDs/metadata
+still cannot guarantee immutable resource bytes; this is not a byte-level content hash.
+
+The existing **Listen** action always opens the audio chooser; merely opening or
+discovering editions does not start MP3 playback. No separate EPUB listening button
+is added. The built-in reader streams an undownloaded EPUB instead of fetching the
+entire archive; explicit downloads open locally. Reader settings contain only
+**Built-in** and **BookOrbit**, including migration from both previous native modes.
 
 ## Validation boundaries
 
@@ -86,3 +95,18 @@ timeout (`20261127T183456554347Z`). Logcat reports the sign-in requirement on th
 signed-out emulator; the test assumes an authenticated app fixture. It is not a
 passing authenticated Android Auto acceptance result, nor proof that the remaining
 voice/resumption path is regression-free. No real account was used to bypass it.
+
+### Reader-mode/audio-chooser follow-up (2026-11-28)
+
+- Both flavors: assemble, lint and 665 JVM tests/flavor passed; fdroid test APK
+  assembled. Node 31/31 and Python 20/20 passed.
+- Unit coverage includes migration of both old native settings, streaming policy
+  for undownloaded EPUBs, mixed MP3/EPUB discovery without optional content version
+  or archive download, and metadata snapshot changes.
+- Three emulator runs each: `AudioEditionDialogTest`
+  (`20261128T150024385050Z`), `ReaderPositionRestoreTest`
+  (`20261128T150034051059Z`), `NativeNarrationRangeTest`
+  (`20261128T150044424028Z`), `NativeAudioPlayerUiTest`
+  (`20261128T150049156063Z`). Dialog coverage verifies no MP3 callback on render
+  and explicit EPUB selection. The user's actual book/server and installed APK
+  were not inspected; these are synthetic regression checks, not device acceptance.

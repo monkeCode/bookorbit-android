@@ -17,6 +17,22 @@ class NativeNarrationTimelineTest {
     private fun timeline(value: NativeNarrationPlaylist = playlist) = NativeNarrationTimeline(value, 5, 84)
     private val saved = ReadAlongPosition(0, "OPS/0.xhtml#two", "OPS/0.mp3", 11.724068, 1.25)
 
+    @Test fun `streaming narration does not require optional content version metadata`() {
+        val file = com.bookorbit.core.model.BookFileRef(84, "epub", "primary")
+        val fingerprint = timeline().streamingFingerprint(file)
+        assertTrue(fingerprint.startsWith("stream-v2:"))
+        assertEquals(fingerprint, timeline().streamingFingerprint(file))
+        assertNotEquals(fingerprint, timeline(playlist.copy(items = playlist.items.map {
+            if (it.index == 0) it.copy(textFragment = "changed") else it
+        })).streamingFingerprint(file))
+        assertNotEquals(fingerprint, timeline().streamingFingerprint(file.copy(fileHash = "changed-file")))
+    }
+
+    @Test fun `existing versioned stream owners retain their identity`() {
+        val file = com.bookorbit.core.model.BookFileRef(84, "epub", "primary", contentVersion = "v1", fileHash = "hash", sizeBytes = 100)
+        assertEquals("stream-v1:v1:hash:100", timeline().streamingFingerprint(file))
+    }
+
     @Test fun `audio only seek maps book clock into exact embedded resource time`() {
         val value = timeline().atSeconds(23.5, 1.25)!!
         assertEquals(2, value.sectionIndex)

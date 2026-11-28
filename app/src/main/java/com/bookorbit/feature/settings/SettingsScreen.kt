@@ -214,7 +214,6 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                             RadioButton(selected = readerInterface == mode, onClick = null)
                             Text(stringResource(when (mode) {
                                 ReaderInterface.APP -> R.string.reader_interface_app
-                                ReaderInterface.APP_STREAMING -> R.string.reader_interface_streaming
                                 ReaderInterface.SERVER_WEB -> R.string.reader_interface_web
                             }), modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyMedium)
                         }

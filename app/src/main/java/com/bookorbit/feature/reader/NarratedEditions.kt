@@ -29,16 +29,23 @@ class NarratedEditions @Inject constructor(private val source: ReaderSource, pri
     private suspend fun open(bookId: Int, file: BookFileRef, account: SessionOwner): Pair<ReadAlongOwner, NativeNarrationSource> {
         check(session.owns(account))
         val available = source.availableFile(bookId, file)
-        val fingerprint = if (available != null) withContext(Dispatchers.IO) {
+        if (available == null) {
+            val plan = streaming.open(bookId, file.id, account)
+            try {
+                val owner = ReadAlongOwner(account.serverUrl, account.userId, file.id, plan.timeline.streamingFingerprint(file))
+                return owner to plan
+            } catch (e: Exception) { plan.close(); throw e }
+        }
+        val fingerprint = withContext(Dispatchers.IO) {
             val digest = MessageDigest.getInstance("SHA-256")
             available.ref.openInputStream(context).use { input ->
                 val bytes = ByteArray(64 * 1024)
                 while (true) { coroutineContext.ensureActive(); val count = input.read(bytes); if (count < 0) break; digest.update(bytes, 0, count) }
             }
             digest.digest().joinToString("") { "%02x".format(it) }
-        } else "stream-v1:${checkNotNull(file.contentVersion?.takeIf { it.isNotBlank() })}:${file.fileHash.orEmpty()}:${file.sizeBytes}"
+        }
         val owner = ReadAlongOwner(account.serverUrl, account.userId, file.id, fingerprint)
-        return owner to if (available != null) local.open(available.ref, bookId, owner, account) else streaming.open(bookId, file.id, account)
+        return owner to local.open(available.ref, bookId, owner, account)
     }
 
     suspend fun discover(book: BookDetail): List<NarratedEdition> {

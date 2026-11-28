@@ -154,10 +154,7 @@ fun BookDetailScreen(
                     onRead = onRead,
                     onReadPdf = onReadPdf,
                     onReadComic = onReadComic,
-                    onListen = { id ->
-                        if (ui.book?.files?.any { it.format.equals("epub", true) } == true) { audioChooser = true; vm.discoverAudio() }
-                        else onListen(id)
-                    },
+                    onListen = { audioChooser = true; vm.discoverAudio() },
                     onBookClick = onBookClick,
                     onAuthorClick = onAuthorClick,
                     onSeriesClick = onSeriesClick,
@@ -170,17 +167,13 @@ fun BookDetailScreen(
     }
 
     val book = ui.book
-    if (audioChooser && book != null) androidx.compose.material3.AlertDialog(onDismissRequest = { if (!audioStarting) { vm.cancelAudioDiscovery(); audioChooser = false } },
-        title = { Text(stringResource(R.string.narration_editions)) },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (BookFiles.isAudiobook(book)) androidx.compose.material3.TextButton(enabled = !audioStarting, onClick = { vm.cancelAudioDiscovery(); audioChooser = false; onListen(book.id) }) { Text(stringResource(R.string.sync_audio)) }
-            audioEditions.forEach { edition -> androidx.compose.material3.TextButton(enabled = !audioStarting, onClick = {
-                vm.playNarration(edition) { audioChooser = false; onOpenPlayer() }
-            }) { Text(stringResource(R.string.narration_edition, edition.fileId)) } }
-            if (audioLoading || audioStarting) CircularProgressIndicator()
-            else if (audioEditions.isEmpty()) Text(stringResource(R.string.narration_no_editions))
-            if (audioFailed) Text(stringResource(R.string.player_err_load), color = MaterialTheme.colorScheme.error)
-        } }, confirmButton = { androidx.compose.material3.TextButton(onClick = { vm.cancelAudioDiscovery(); audioChooser = false }, enabled = !audioStarting) { Text(stringResource(R.string.cancel)) } })
+    if (audioChooser && book != null) AudioEditionDialog(
+        hasAudiobook = BookFiles.isAudiobook(book), editions = audioEditions,
+        loading = audioLoading, starting = audioStarting, failed = audioFailed,
+        onAudiobook = { vm.cancelAudioDiscovery(); audioChooser = false; onListen(book.id) },
+        onNarration = { edition -> vm.playNarration(edition) { audioChooser = false; onOpenPlayer() } },
+        onDismiss = { vm.cancelAudioDiscovery(); audioChooser = false },
+    )
     if (book != null && downloadSheet) {
         val download by vm.downloadState.collectAsStateWithLifecycle()
         DownloadSelectionDialog(book, confirmDownload, onDismiss = { downloadSheet = false }, existingFileIds = vm.downloadedFileIds(download))

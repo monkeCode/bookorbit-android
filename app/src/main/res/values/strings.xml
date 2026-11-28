@@ -469,10 +469,9 @@
     <string name="settings_reading">Reading</string>
     <string name="settings_reader_interface">Reader interface</string>
     <string name="settings_reader_interface_desc">Choose how to open books.</string>
-    <string name="reader_interface_app">App · cached file (default)</string>
-    <string name="reader_interface_streaming">App · online EPUB</string>
+    <string name="reader_interface_app">Built-in</string>
     <string name="reader_streaming_progress">Online EPUB · %1$d%%</string>
-    <string name="reader_interface_web">Server web reader</string>
+    <string name="reader_interface_web">BookOrbit</string>
     <string name="settings_reading_fullscreen">Full-screen reading</string>
     <string name="settings_reading_fullscreen_desc">Read edge to edge.</string>
     <string name="reader_web_unavailable">The server web reader could not be opened. Check your connection or open this book in the app.</string>
